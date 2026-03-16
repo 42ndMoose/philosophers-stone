@@ -64,6 +64,55 @@ export class EpistemicProfiler {
     return map[axis][direction];
   }
 
+
+  static formatSigned(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '+.00';
+    const sign = num >= 0 ? '+' : '-';
+    return `${sign}${Math.abs(num).toFixed(2)}`;
+  }
+
+  static compactProfileLine(item = {}) {
+    if (!item || typeof item !== 'object') return null;
+
+    const axisLabelMap = {
+      empathyPracticality: {
+        empathy: 'empathy',
+        practicality: 'practicality',
+      },
+      wisdomKnowledge: {
+        wisdom: 'wisdom',
+        knowledge: 'knowledge',
+      },
+      epistemicStability: {
+        positive: 'stability',
+        negative: 'instability',
+      },
+    };
+
+    const label = axisLabelMap[item.axis]?.[item.direction];
+    if (!label) return null;
+
+    const confidence = EpistemicProfiler.clamp(Number(item.confidence), 0, 1);
+    if (!Number.isFinite(confidence)) return null;
+
+    const strengthWeight = {
+      weak: 0.33,
+      moderate: 0.66,
+      strong: 1.0,
+    }[item.strength];
+    if (!strengthWeight) return null;
+
+    const signed = (item.direction === 'negative' || item.direction === 'practicality' || item.direction === 'knowledge' ? -1 : 1)
+      * confidence
+      * strengthWeight;
+
+    const reason = String(item.reason || '').trim().replace(/\s+/g, ' ');
+    if (!reason) return null;
+
+    return `${EpistemicProfiler.formatSigned(signed)} ${label} "${reason}"`;
+  }
+
   strengthWeight(strength) {
     const weight = this.config.strengthWeights[strength];
     if (typeof weight !== 'number') {
@@ -122,8 +171,13 @@ export class EpistemicProfiler {
 
     payload.evidence.forEach((item, i) => this.validateEvidenceItem(item, i));
 
+    const profile = Array.isArray(payload.profile)
+      ? payload.profile.map((item) => String(item || '').trim()).filter(Boolean)
+      : [];
+
     const entry = {
       model: payload.model || null,
+      profile,
       evidence: payload.evidence.map((item) => ({ ...item })),
       notes: Array.isArray(payload.notes) ? [...payload.notes] : [],
       principles: Array.isArray(payload.principles) ? [...payload.principles] : [],
@@ -131,6 +185,18 @@ export class EpistemicProfiler {
       parameters: payload.parameters && typeof payload.parameters === 'object' ? { ...payload.parameters } : {},
       addedAt: new Date().toISOString(),
     };
+
+    if (!entry.profile.length) {
+      const bestEvidence = [...entry.evidence]
+        .filter((item) => EpistemicProfiler.signFromDirection(item.axis, item.direction) !== 0)
+        .sort((a, b) => {
+          const wa = this.strengthWeight(a.strength) * a.confidence;
+          const wb = this.strengthWeight(b.strength) * b.confidence;
+          return wb - wa;
+        })[0];
+      const fallback = EpistemicProfiler.compactProfileLine(bestEvidence);
+      if (fallback) entry.profile = [fallback];
+    }
 
     if (entry.principles.length) {
       this.state.principles = [...entry.principles];
@@ -282,8 +348,11 @@ export class EpistemicProfiler {
       rejectBalancedNonPole: this.config.rejectBalancedNonPole,
     });
 
+    const latestProfile = this.state.entries.at(-1)?.profile || [];
+
     const finalized = {
       model: profile.model,
+      profile: [...latestProfile],
       principles: [...this.state.principles],
       boundaries: [...this.state.boundaries],
       parameters: { ...this.state.parameters },
