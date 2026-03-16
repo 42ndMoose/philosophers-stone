@@ -1503,7 +1503,9 @@
       if (state.hoveredAspectLabel) showAspectTooltip(state.hoveredAspectLabel);
     });
 
-    function setPointFromExternal(point) {
+    function setPointFromExternal(profileData) {
+      if (!profileData || typeof profileData !== 'object') return;
+      const point = profileData?.data?.point;
       if (!point || typeof point !== 'object') return;
       const x = Number(point.x);
       const y = Number(point.y);
@@ -1518,8 +1520,8 @@
     }
 
     window.addEventListener('message', (event) => {
-      if (event.data?.type === 'set-point') {
-        setPointFromExternal(event.data.point);
+      if (event.data?.type === 'set-profile') {
+        setPointFromExternal(event.data.data);
       }
     });
 

@@ -21,6 +21,10 @@ export class EpistemicProfiler {
 
     this.state = {
       entries: [],
+      principles: [],
+      boundaries: [],
+      parameters: {},
+      finalized: null,
     };
   }
 
@@ -122,8 +126,21 @@ export class EpistemicProfiler {
       model: payload.model || null,
       evidence: payload.evidence.map((item) => ({ ...item })),
       notes: Array.isArray(payload.notes) ? [...payload.notes] : [],
+      principles: Array.isArray(payload.principles) ? [...payload.principles] : [],
+      boundaries: Array.isArray(payload.boundaries) ? [...payload.boundaries] : [],
+      parameters: payload.parameters && typeof payload.parameters === 'object' ? { ...payload.parameters } : {},
       addedAt: new Date().toISOString(),
     };
+
+    if (entry.principles.length) {
+      this.state.principles = [...entry.principles];
+    }
+    if (entry.boundaries.length) {
+      this.state.boundaries = [...entry.boundaries];
+    }
+    if (Object.keys(entry.parameters).length) {
+      this.state.parameters = { ...entry.parameters };
+    }
 
     this.state.entries.push(entry);
     return entry;
@@ -265,13 +282,30 @@ export class EpistemicProfiler {
       rejectBalancedNonPole: this.config.rejectBalancedNonPole,
     });
 
+    const finalized = {
+      model: profile.model,
+      principles: [...this.state.principles],
+      boundaries: [...this.state.boundaries],
+      parameters: { ...this.state.parameters },
+      data: {
+        point: { ...result.point },
+      },
+    };
+
+    this.state.finalized = finalized;
+
     return {
       ...result,
       semanticProfile: profile,
+      finalized,
     };
   }
 
   reset() {
     this.state.entries = [];
+    this.state.principles = [];
+    this.state.boundaries = [];
+    this.state.parameters = {};
+    this.state.finalized = null;
   }
 }
