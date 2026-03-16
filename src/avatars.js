@@ -1,62 +1,62 @@
 export const AVATARS = [
   {
-    id: 'positive-stability',
-    title: 'Positive Stability',
-    src: './assets/avatars/positive-stability.svg',
+    id: 'steady',
+    title: 'Steady',
+    src: './assets/avatars/steady.svg',
     short: 'Top Pole',
   },
   {
-    id: 'negative-stability',
-    title: 'Negative Stability',
-    src: './assets/avatars/negative-stability.svg',
+    id: 'feral',
+    title: 'Feral',
+    src: './assets/avatars/feral.svg',
     short: 'Lower Pole',
   },
   {
-    id: 'empathy',
-    title: 'Empathy',
-    src: './assets/avatars/empathy.svg',
+    id: 'kind',
+    title: 'Kind',
+    src: './assets/avatars/kind.svg',
     short: 'Positive X',
   },
   {
-    id: 'practicality',
-    title: 'Practicality',
-    src: './assets/avatars/practicality.svg',
+    id: 'gritty',
+    title: 'Gritty',
+    src: './assets/avatars/gritty.svg',
     short: 'Negative X',
   },
   {
-    id: 'wisdom',
-    title: 'Wisdom',
-    src: './assets/avatars/wisdom.svg',
+    id: 'sage',
+    title: 'Sage',
+    src: './assets/avatars/sage.svg',
     short: 'Positive Z',
   },
   {
-    id: 'knowledge',
-    title: 'Knowledge',
-    src: './assets/avatars/knowledge.svg',
+    id: 'geeky',
+    title: 'Geeky',
+    src: './assets/avatars/geeky.svg',
     short: 'Negative Z',
   },
   {
-    id: 'empathy-wisdom',
-    title: 'Empathy + Wisdom',
-    src: './assets/avatars/empathy-wisdom.svg',
+    id: 'radiant',
+    title: 'Radiant',
+    src: './assets/avatars/radiant.svg',
     short: 'Upper Equator',
   },
   {
-    id: 'empathy-knowledge',
-    title: 'Empathy + Knowledge',
-    src: './assets/avatars/empathy-knowledge.svg',
+    id: 'quirky',
+    title: 'Quirky',
+    src: './assets/avatars/quirky.svg',
     short: 'Front Equator',
   },
   {
-    id: 'practicality-wisdom',
-    title: 'Practicality + Wisdom',
-    src: './assets/avatars/practicality-wisdom.svg',
+    id: 'shrewd',
+    title: 'Shrewd',
+    src: './assets/avatars/shrewd.svg',
     short: 'Rear Equator',
   },
   {
-    id: 'practicality-knowledge',
-    title: 'Practicality + Knowledge',
-    src: './assets/avatars/practicality-knowledge.svg',
+    id: 'rogue',
+    title: 'Rogue',
+    src: './assets/avatars/rogue.svg',
     short: 'Lower Equator',
   },
 ];
@@ -70,22 +70,22 @@ export function pickAvatarFromPoint(point) {
   const ay = Math.abs(y);
 
   if (ay >= 0.68) {
-    return y >= 0 ? getAvatarById('positive-stability') : getAvatarById('negative-stability');
+    return y >= 0 ? getAvatarById('steady') : getAvatarById('feral');
   }
 
   const hasX = Math.abs(x) >= 0.18;
   const hasZ = Math.abs(z) >= 0.18;
 
   if (hasX && hasZ) {
-    if (x >= 0 && z >= 0) return getAvatarById('empathy-wisdom');
-    if (x >= 0 && z < 0) return getAvatarById('empathy-knowledge');
-    if (x < 0 && z >= 0) return getAvatarById('practicality-wisdom');
-    return getAvatarById('practicality-knowledge');
+    if (x >= 0 && z >= 0) return getAvatarById('radiant');
+    if (x >= 0 && z < 0) return getAvatarById('quirky');
+    if (x < 0 && z >= 0) return getAvatarById('shrewd');
+    return getAvatarById('rogue');
   }
 
   if (Math.abs(x) >= Math.abs(z)) {
-    return x >= 0 ? getAvatarById('empathy') : getAvatarById('practicality');
+    return x >= 0 ? getAvatarById('kind') : getAvatarById('gritty');
   }
 
-  return z >= 0 ? getAvatarById('wisdom') : getAvatarById('knowledge');
+  return z >= 0 ? getAvatarById('sage') : getAvatarById('geeky');
 }

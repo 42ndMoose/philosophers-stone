@@ -77,20 +77,22 @@
           </div>
         </div>
 
-        <div class="avatar-current-wrap">
-          <button id="selectedAvatarBtn" class="avatar-btn avatar-btn-current" type="button" aria-expanded="false"></button>
-          <button id="toggleAvatarGridBtn" class="tiny-btn" type="button" aria-expanded="false">Change profile pic</button>
-        </div>
-        <div id="avatarGrid" class="avatar-grid hidden"></div>
+        <div class="profile-head-row">
+          <div class="avatar-current-wrap">
+            <button id="selectedAvatarBtn" class="avatar-btn avatar-btn-current" type="button" aria-label="Current profile picture"></button>
+            <button id="toggleAvatarGridBtn" class="avatar-edit-btn" type="button" aria-label="Edit profile picture" aria-expanded="false">✎</button>
+            <div id="avatarGrid" class="avatar-grid avatar-popup hidden" role="dialog" aria-label="Choose profile picture"></div>
+          </div>
 
-        <div class="field-grid">
-          <label>
+          <label class="name-field">
             <span>Name</span>
             <input id="profileName" type="text" placeholder="Optional profile name" />
           </label>
+        </div>
+
+        <div class="field-grid profile-meta-row">
           <label>
-            <span>Age</span>
-            <input id="profileAge" type="text" placeholder="Freely editable" />
+            <input id="profileAge" type="text" placeholder="Additional info eg. age, gender, persona" />
           </label>
         </div>
 

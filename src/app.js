@@ -105,27 +105,24 @@ function autoResizeTextarea(textarea, maxRows = 22) {
 function renderAvatars() {
   const selectedAvatar = getAvatarById(state.selectedAvatarId) || AVATARS[0];
 
-  els.selectedAvatarBtn.innerHTML = `
-    <img src="${selectedAvatar.src}" alt="${selectedAvatar.title}" />
-    <span>${selectedAvatar.title}</span>
-  `;
+  els.selectedAvatarBtn.innerHTML = `<img src="${selectedAvatar.src}" alt="${selectedAvatar.title}" />`;
 
   els.avatarGrid.innerHTML = '';
   for (const avatar of AVATARS) {
+    if (avatar.id === selectedAvatar.id) continue;
+
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = `avatar-btn${state.selectedAvatarId === avatar.id ? ' is-selected' : ''}`;
+    btn.className = 'avatar-btn avatar-option-btn';
     btn.dataset.avatarId = avatar.id;
-    btn.innerHTML = `
-      <img src="${avatar.src}" alt="${avatar.title}" />
-      <span>${avatar.title}</span>
-    `;
+    btn.innerHTML = `<img src="${avatar.src}" alt="${avatar.title}" />`;
     btn.addEventListener('click', () => {
       state.selectedAvatarId = avatar.id;
       state.manualAvatar = true;
       state.avatarPickerOpen = false;
       renderAvatars();
       updateStatsAvatar();
+      renderPacketPreview();
       saveState();
     });
     els.avatarGrid.appendChild(btn);
@@ -133,7 +130,6 @@ function renderAvatars() {
 
   const isOpen = Boolean(state.avatarPickerOpen);
   els.avatarGrid.classList.toggle('hidden', !isOpen);
-  els.toggleAvatarGridBtn.textContent = isOpen ? 'Hide profile pics' : 'Change profile pic';
   els.toggleAvatarGridBtn.setAttribute('aria-expanded', String(isOpen));
 }
 
@@ -612,8 +608,12 @@ function bind() {
     saveState();
   });
 
-  els.selectedAvatarBtn.addEventListener('click', () => {
-    state.avatarPickerOpen = !state.avatarPickerOpen;
+
+  document.addEventListener('click', (event) => {
+    if (!state.avatarPickerOpen) return;
+    const target = event.target;
+    if (els.avatarGrid.contains(target) || els.toggleAvatarGridBtn.contains(target)) return;
+    state.avatarPickerOpen = false;
     renderAvatars();
     saveState();
   });
