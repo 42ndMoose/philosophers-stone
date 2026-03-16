@@ -7,6 +7,7 @@ const STORAGE_KEY = 'philosophers-stone-workspace-v1';
 const els = {
   profileText: document.getElementById('profileText'),
   llmOutput: document.getElementById('llmOutput'),
+  pasteLlmOutputBtn: document.getElementById('pasteLlmOutputBtn'),
   copyPacketBtn: document.getElementById('copyPacketBtn'),
   copyStatus: document.getElementById('copyStatus'),
   togglePacketPreviewBtn: document.getElementById('togglePacketPreviewBtn'),
@@ -16,6 +17,8 @@ const els = {
   compileBtn: document.getElementById('compileBtn'),
   compileStatus: document.getElementById('compileStatus'),
   avatarGrid: document.getElementById('avatarGrid'),
+  selectedAvatarBtn: document.getElementById('selectedAvatarBtn'),
+  toggleAvatarGridBtn: document.getElementById('toggleAvatarGridBtn'),
   profileName: document.getElementById('profileName'),
   profileAge: document.getElementById('profileAge'),
   canonInput: document.getElementById('canonInput'),
@@ -36,7 +39,6 @@ const els = {
   coordX: document.getElementById('coordX'),
   coordY: document.getElementById('coordY'),
   coordZ: document.getElementById('coordZ'),
-  diagnosticsBox: document.getElementById('diagnosticsBox'),
   notesList: document.getElementById('notesList'),
   profileEntriesList: document.getElementById('profileEntriesList'),
   visualizerFrame: document.getElementById('visualizerFrame'),
@@ -53,7 +55,11 @@ const state = {
   principles: [],
   boundaries: [],
   latestCompile: null,
+  compiledPayloads: [],
+  avatarPickerOpen: false,
 };
+
+const profiler = new EpistemicProfiler({ rejectBalancedNonPole: false });
 
 function formatPercent(value) {
   return `${Number(value).toFixed(1)}%`;
@@ -97,6 +103,13 @@ function autoResizeTextarea(textarea, maxRows = 22) {
 }
 
 function renderAvatars() {
+  const selectedAvatar = getAvatarById(state.selectedAvatarId) || AVATARS[0];
+
+  els.selectedAvatarBtn.innerHTML = `
+    <img src="${selectedAvatar.src}" alt="${selectedAvatar.title}" />
+    <span>${selectedAvatar.title}</span>
+  `;
+
   els.avatarGrid.innerHTML = '';
   for (const avatar of AVATARS) {
     const btn = document.createElement('button');
@@ -110,12 +123,18 @@ function renderAvatars() {
     btn.addEventListener('click', () => {
       state.selectedAvatarId = avatar.id;
       state.manualAvatar = true;
+      state.avatarPickerOpen = false;
       renderAvatars();
       updateStatsAvatar();
       saveState();
     });
     els.avatarGrid.appendChild(btn);
   }
+
+  const isOpen = Boolean(state.avatarPickerOpen);
+  els.avatarGrid.classList.toggle('hidden', !isOpen);
+  els.toggleAvatarGridBtn.textContent = isOpen ? 'Hide profile pics' : 'Change profile pic';
+  els.toggleAvatarGridBtn.setAttribute('aria-expanded', String(isOpen));
 }
 
 function makeCanonItem(text, type, index) {
@@ -320,7 +339,7 @@ function postPointToVisualizer(finalized) {
 }
 
 function renderCompile(result, payload) {
-  const { point, semanticProfile, debug, finalized } = result;
+  const { point, semanticProfile, finalized } = result;
   const uiLike = semanticProfile.uiLike;
 
   els.statEmpathy.textContent = formatPercent(uiLike.empathyPercent);
@@ -331,24 +350,15 @@ function renderCompile(result, payload) {
   els.coordX.textContent = formatCoord(point.x);
   els.coordY.textContent = formatCoord(point.y);
   els.coordZ.textContent = formatCoord(point.z);
-  els.diagnosticsBox.textContent = JSON.stringify(
-    {
-      semantics: semanticProfile.semantics,
-      uiLike: semanticProfile.uiLike,
-      diagnostics: semanticProfile.diagnostics,
-      debug,
-    },
-    null,
-    2,
-  );
   renderNotes(payload.notes);
-  renderProfileEntries(finalized.profile);
+  const stackedProfileEntries = state.latestCompile?.stackedProfileEntries || finalized.profile;
+  renderProfileEntries(stackedProfileEntries);
 
   if (!state.manualAvatar) {
     const picked = pickAvatarFromPoint(point);
-    if (picked) {
+    if (picked && !state.name.trim() && !state.selectedAvatarId) {
       state.selectedAvatarId = picked.id;
-      if (!state.name.trim()) state.name = picked.title;
+      state.name = picked.title;
       els.profileName.value = state.name;
     }
   }
@@ -358,28 +368,83 @@ function renderCompile(result, payload) {
   postPointToVisualizer(finalized);
 }
 
+function extractCanonFromText(rawText = '') {
+  const lines = String(rawText || '').split('\n');
+  let section = '';
+  const principles = [];
+  const boundaries = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (/^principles?\b\s*:?$/i.test(trimmed)) {
+      section = 'principles';
+      continue;
+    }
+    if (/^boundaries?\b\s*:?$/i.test(trimmed)) {
+      section = 'boundaries';
+      continue;
+    }
+    const item = trimmed.replace(/^[-*\d.)\s]+/, '').trim();
+    if (!item) continue;
+    if (section === 'principles') principles.push(item);
+    if (section === 'boundaries') boundaries.push(item);
+  }
+
+  return { principles: mergeUnique([], principles), boundaries: mergeUnique([], boundaries) };
+}
+
+function parseLLMOutput(raw) {
+  try {
+    const payload = JSON.parse(raw);
+    return { payload, canonFromText: { principles: [], boundaries: [] } };
+  } catch {
+    const textCanon = extractCanonFromText(raw);
+    return {
+      payload: {
+        model: 'epistemic_octahedron_interpreter_v1',
+        profile: String(raw).split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 20),
+        evidence: [],
+        notes: ['Compiled from plain text dump without explicit evidence.'],
+        principles: textCanon.principles,
+        boundaries: textCanon.boundaries,
+      },
+      canonFromText: textCanon,
+    };
+  }
+}
+
 function compilePayload() {
   const raw = sanitizeJSONInput(state.llmOutput);
   if (!raw) {
-    throw new Error('Paste LLM JSON before compiling.');
+    throw new Error('Paste LLM output before compiling.');
   }
 
-  const payload = JSON.parse(raw);
+  const { payload, canonFromText } = parseLLMOutput(raw);
   const extractedCanon = extractCanonFromPayload(payload);
-  const profiler = new EpistemicProfiler();
   profiler.addLLMOutput(payload);
   const result = profiler.computePoint();
 
-  if (extractedCanon.principles.length) {
-    state.principles = mergeUnique(state.principles, extractedCanon.principles);
+  const mergedCanonPrinciples = mergeUnique(extractedCanon.principles, canonFromText.principles);
+  const mergedCanonBoundaries = mergeUnique(extractedCanon.boundaries, canonFromText.boundaries);
+
+  if (mergedCanonPrinciples.length) {
+    state.principles = mergeUnique(state.principles, mergedCanonPrinciples);
   }
-  if (extractedCanon.boundaries.length) {
-    state.boundaries = mergeUnique(state.boundaries, extractedCanon.boundaries);
+  if (mergedCanonBoundaries.length) {
+    state.boundaries = mergeUnique(state.boundaries, mergedCanonBoundaries);
   }
+
+  const priorStack = state.latestCompile?.stackedProfileEntries || [];
+  const nextProfile = Array.isArray(result.finalized?.profile) ? result.finalized.profile : [];
+  const stackedProfileEntries = mergeUnique(priorStack, nextProfile);
+
+  state.compiledPayloads.push(payload);
 
   state.latestCompile = {
     payload,
     result,
+    stackedProfileEntries,
     compiledAt: new Date().toISOString(),
   };
 
@@ -425,6 +490,11 @@ function resetWorkspace() {
 }
 
 function renderAll() {
+  profiler.reset();
+  if (!Array.isArray(state.compiledPayloads)) state.compiledPayloads = [];
+  state.compiledPayloads.forEach((payload) => {
+    try { profiler.addLLMOutput(payload); } catch {}
+  });
   els.profileText.value = state.profileText || '';
   els.llmOutput.value = state.llmOutput || '';
   els.profileName.value = state.name || '';
@@ -491,7 +561,7 @@ function bind() {
   els.compileBtn.addEventListener('click', () => {
     try {
       compilePayload();
-      setCompileStatus('Compiled in profiler and finalized data sent.', 'is-success');
+      setCompileStatus('Compiled and merged into profile.', 'is-success');
     } catch (error) {
       setCompileStatus(error.message || 'Compile failed.', 'is-error');
     }
@@ -522,6 +592,31 @@ function bind() {
   });
 
   els.resetWorkspaceBtn.addEventListener('click', resetWorkspace);
+
+
+  els.pasteLlmOutputBtn.addEventListener('click', async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      state.llmOutput = String(text || '').trim();
+      els.llmOutput.value = state.llmOutput;
+      saveState();
+      setCompileStatus('Pasted latest output.', 'is-success');
+    } catch {
+      setCompileStatus('Paste failed. Clipboard permissions may be blocked.', 'is-error');
+    }
+  });
+
+  els.toggleAvatarGridBtn.addEventListener('click', () => {
+    state.avatarPickerOpen = !state.avatarPickerOpen;
+    renderAvatars();
+    saveState();
+  });
+
+  els.selectedAvatarBtn.addEventListener('click', () => {
+    state.avatarPickerOpen = !state.avatarPickerOpen;
+    renderAvatars();
+    saveState();
+  });
 
   els.refreshVisualizerBtn.addEventListener('click', () => {
     const finalized = state.latestCompile?.result?.finalized;
