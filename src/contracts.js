@@ -278,6 +278,9 @@ Each evidence item must follow this shape:
 REQUIRED JSON SHAPE
 {
   "model": "epistemic_octahedron_interpreter_v1",
+  "profile": [
+    "+.12 stability +.05 practicality \"reasoning leans interpretive and synthetic rather than purely factual\""
+  ],
   "evidence": [
     {
       "axis": "empathyPracticality",
@@ -305,9 +308,16 @@ REQUIRED JSON SHAPE
     }
   ],
   "notes": [
-    "optional short note about ambiguity, contradiction, or uncertainty"
+    "optional short ambiguity note"
   ]
 }
+
+PROFILE ENTRY RULE
+- Emit exactly one short profile line in the "profile" array.
+- Keep it to one sentence and one line.
+- Format it like:
+  +.12 stability +.05 practicality "short justification"
+- Avoid long explanations.
 
 INTERPRETATION RULES FOR THE LLM
 1. Assess the user's text semantically, not geometrically.

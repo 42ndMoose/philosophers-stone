@@ -38,6 +38,7 @@ const els = {
   coordZ: document.getElementById('coordZ'),
   diagnosticsBox: document.getElementById('diagnosticsBox'),
   notesList: document.getElementById('notesList'),
+  profileEntriesList: document.getElementById('profileEntriesList'),
   visualizerFrame: document.getElementById('visualizerFrame'),
   refreshVisualizerBtn: document.getElementById('refreshVisualizerBtn'),
 };
@@ -244,6 +245,65 @@ function updateStatsAvatar() {
   els.statAvatar.textContent = getAvatarTitle(state.selectedAvatarId);
 }
 
+
+
+function cleanStringList(items = []) {
+  return items
+    .map((item) => {
+      if (typeof item === 'string') return item.trim();
+      if (item && typeof item === 'object') {
+        return String(item.text || item.value || item.principle || item.boundary || '').trim();
+      }
+      return '';
+    })
+    .filter(Boolean);
+}
+
+function mergeUnique(base = [], extra = []) {
+  const seen = new Set(base.map((item) => item.toLowerCase()));
+  const merged = [...base];
+  for (const item of extra) {
+    const key = item.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(item);
+    }
+  }
+  return merged;
+}
+
+function extractCanonFromPayload(payload = {}) {
+  const directPrinciples = cleanStringList(payload.principles || []);
+  const directBoundaries = cleanStringList(payload.boundaries || []);
+
+  const updates = payload.canonUpdates || payload.canon_updates || payload.updates || {};
+  const updatePrinciples = cleanStringList([
+    ...(updates.principles || []),
+    ...(updates.addPrinciples || []),
+    ...(updates.add_principles || []),
+  ]);
+  const updateBoundaries = cleanStringList([
+    ...(updates.boundaries || []),
+    ...(updates.addBoundaries || []),
+    ...(updates.add_boundaries || []),
+  ]);
+
+  return {
+    principles: mergeUnique(directPrinciples, updatePrinciples),
+    boundaries: mergeUnique(directBoundaries, updateBoundaries),
+  };
+}
+
+function renderProfileEntries(entries = []) {
+  els.profileEntriesList.innerHTML = '';
+  const lines = Array.isArray(entries) && entries.length ? entries : ['No profile entry yet.'];
+  lines.forEach((line) => {
+    const li = document.createElement('li');
+    li.textContent = line;
+    els.profileEntriesList.appendChild(li);
+  });
+}
+
 function renderNotes(notes = []) {
   els.notesList.innerHTML = '';
   const items = Array.isArray(notes) && notes.length ? notes : ['No notes yet.'];
@@ -282,6 +342,7 @@ function renderCompile(result, payload) {
     2,
   );
   renderNotes(payload.notes);
+  renderProfileEntries(finalized.profile);
 
   if (!state.manualAvatar) {
     const picked = pickAvatarFromPoint(point);
@@ -304,9 +365,17 @@ function compilePayload() {
   }
 
   const payload = JSON.parse(raw);
+  const extractedCanon = extractCanonFromPayload(payload);
   const profiler = new EpistemicProfiler();
   profiler.addLLMOutput(payload);
   const result = profiler.computePoint();
+
+  if (extractedCanon.principles.length) {
+    state.principles = mergeUnique(state.principles, extractedCanon.principles);
+  }
+  if (extractedCanon.boundaries.length) {
+    state.boundaries = mergeUnique(state.boundaries, extractedCanon.boundaries);
+  }
 
   state.latestCompile = {
     payload,
@@ -314,6 +383,8 @@ function compilePayload() {
     compiledAt: new Date().toISOString(),
   };
 
+  renderCanonLists();
+  renderPacketPreview();
   renderCompile(result, payload);
   saveState();
   return result;
@@ -368,6 +439,7 @@ function renderAll() {
     renderCompile(state.latestCompile.result, state.latestCompile.payload);
   } else {
     renderNotes([]);
+    renderProfileEntries([]);
   }
 }
 

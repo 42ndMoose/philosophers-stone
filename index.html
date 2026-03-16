@@ -58,6 +58,7 @@
         </div>
         <textarea id="llmOutput" class="code-box" spellcheck="false" placeholder='{
   "model": "epistemic_octahedron_interpreter_v1",
+  "profile": ["+.12 stability +.05 practicality \"short justification\""],
   "evidence": []
 }'></textarea>
 
@@ -88,6 +89,13 @@
             <span>Age</span>
             <input id="profileAge" type="text" placeholder="Freely editable" />
           </label>
+        </div>
+
+        <div class="diagnostics-wrap">
+          <div class="mini-head">Profile</div>
+          <ul id="profileEntriesList" class="profile-list">
+            <li>No profile entry yet.</li>
+          </ul>
         </div>
 
         <div class="principles-wrap">
