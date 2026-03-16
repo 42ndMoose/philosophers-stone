@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Philosopher's Stone</title>
+  <link rel="stylesheet" href="./src/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">Epistemic Octahedron</div>
+        <h1>Philosopher's Stone</h1>
+        <p class="hero-copy">One contract, one schema, one place the LLM reads from.</p>
+      </div>
+      <div class="topbar-actions">
+        <a class="ghost-link" href="./visualizer.html" target="_blank" rel="noreferrer">Open visualizer only</a>
+        <button id="resetWorkspaceBtn" class="ghost-btn">Reset workspace</button>
+      </div>
+    </header>
+
+    <main class="workspace-grid">
+      <section class="panel panel-main">
+        <div class="panel-head">
+          <div>
+            <h2>System input</h2>
+            <p>The visible box stays clean. The copy action wraps it with the hidden interpreter contract and JSON schema.</p>
+          </div>
+          <div class="copy-cluster">
+            <button id="copyPacketBtn" class="primary-btn">Copy LLM packet</button>
+            <span id="copyStatus" class="copy-status" aria-live="polite"></span>
+          </div>
+        </div>
+
+        <label class="block-label" for="profileText">Profile text</label>
+        <textarea id="profileText" class="discord-box" rows="1" placeholder="Write or paste the worldview, philosophy, or raw profile text here."></textarea>
+
+        <div class="inline-meta">
+          <div class="info-chip">Expands up to 22 lines</div>
+          <button id="togglePacketPreviewBtn" class="tiny-btn" aria-expanded="false">Show hidden packet</button>
+        </div>
+
+        <div id="packetPreviewWrap" class="packet-preview hidden">
+          <div class="packet-toolbar">
+            <span>Generated LLM packet preview</span>
+            <button id="refreshPacketBtn" class="tiny-btn">Refresh</button>
+          </div>
+          <pre id="packetPreview" class="packet-preview-box"></pre>
+        </div>
+
+        <div class="split-section">
+          <div>
+            <div class="section-title">Paste LLM output</div>
+            <p class="section-sub">Paste the JSON emitted by the interpreter here, then compile it through the profiler.</p>
+          </div>
+          <button id="compileBtn" class="primary-btn">Compile to visualizer</button>
+        </div>
+        <textarea id="llmOutput" class="code-box" spellcheck="false" placeholder='{
+  "model": "epistemic_octahedron_interpreter_v1",
+  "evidence": []
+}'></textarea>
+
+        <div id="compileStatus" class="status-line" aria-live="polite"></div>
+      </section>
+
+      <aside class="panel side-panel">
+        <div class="panel-head stacked-gap">
+          <div>
+            <h2>Profile</h2>
+            <p>Choose an avatar or let the profiler pick one after compile.</p>
+          </div>
+          <div class="toolbar-row">
+            <button id="exportProfileBtn" class="ghost-btn">Export profile</button>
+            <button id="importProfileBtn" class="ghost-btn">Import profile</button>
+            <input id="importProfileInput" type="file" accept="application/json" hidden />
+          </div>
+        </div>
+
+        <div id="avatarGrid" class="avatar-grid"></div>
+
+        <div class="field-grid">
+          <label>
+            <span>Name</span>
+            <input id="profileName" type="text" placeholder="Optional profile name" />
+          </label>
+          <label>
+            <span>Age</span>
+            <input id="profileAge" type="text" placeholder="Freely editable" />
+          </label>
+        </div>
+
+        <div class="principles-wrap">
+          <div class="section-title">Principles and boundaries</div>
+          <p class="section-sub">Add manually, reorder by dragging, or move items between sections.</p>
+
+          <div class="add-row">
+            <input id="canonInput" type="text" placeholder="Add a principle or boundary" />
+            <select id="canonType">
+              <option value="principles">Principle</option>
+              <option value="boundaries">Boundary</option>
+            </select>
+            <button id="addCanonBtn" class="ghost-btn">Add</button>
+          </div>
+
+          <div class="canon-columns">
+            <section>
+              <div class="mini-head">Principles</div>
+              <ul id="principlesList" class="canon-list" data-list-type="principles"></ul>
+            </section>
+            <section>
+              <div class="mini-head">Boundaries</div>
+              <ul id="boundariesList" class="canon-list" data-list-type="boundaries"></ul>
+            </section>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <section class="results-grid">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Profiler output</h2>
+            <p>Deterministic aggregation with the current provisional scoring policy.</p>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Empathy</div>
+            <div id="statEmpathy" class="stat-value">50.0%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Practicality</div>
+            <div id="statPracticality" class="stat-value">50.0%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Wisdom</div>
+            <div id="statWisdom" class="stat-value">50.0%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Knowledge</div>
+            <div id="statKnowledge" class="stat-value">50.0%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Stability</div>
+            <div id="statStability" class="stat-value">0.0%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Avatar</div>
+            <div id="statAvatar" class="stat-value stat-tight">Unassigned</div>
+          </div>
+        </div>
+
+        <div class="coord-grid">
+          <div class="coord-card"><span>X</span><strong id="coordX">0.000</strong></div>
+          <div class="coord-card"><span>Y</span><strong id="coordY">0.000</strong></div>
+          <div class="coord-card"><span>Z</span><strong id="coordZ">0.000</strong></div>
+        </div>
+
+        <div class="diagnostics-wrap">
+          <div class="mini-head">Diagnostics</div>
+          <pre id="diagnosticsBox" class="diagnostics-box">No compile yet.</pre>
+        </div>
+
+        <div class="diagnostics-wrap">
+          <div class="mini-head">Profiler notes</div>
+          <ul id="notesList" class="note-list">
+            <li>No notes yet.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="panel visualizer-panel">
+        <div class="panel-head">
+          <div>
+            <h2>Visualizer preview</h2>
+            <p>The main page sends final x, y, z into the standalone visualizer.</p>
+          </div>
+          <button id="refreshVisualizerBtn" class="ghost-btn">Re-send point</button>
+        </div>
+        <iframe id="visualizerFrame" class="visualizer-frame" src="./visualizer.html" title="Epistemic Octahedron Visualizer"></iframe>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
