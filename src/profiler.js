@@ -348,11 +348,11 @@ export class EpistemicProfiler {
       rejectBalancedNonPole: this.config.rejectBalancedNonPole,
     });
 
-    const latestProfile = this.state.entries.at(-1)?.profile || [];
+    const stackedProfile = this.state.entries.flatMap((entry) => entry.profile || []);
 
     const finalized = {
       model: profile.model,
-      profile: [...latestProfile],
+      profile: [...new Set(stackedProfile)],
       principles: [...this.state.principles],
       boundaries: [...this.state.boundaries],
       parameters: { ...this.state.parameters },

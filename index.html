@@ -52,15 +52,14 @@
         <div class="split-section">
           <div>
             <div class="section-title">Paste LLM output</div>
-            <p class="section-sub">Paste the JSON emitted by the interpreter here, then compile it through the profiler.</p>
+            <p class="section-sub">Paste the interpreter output, then compile it through the profiler.</p>
           </div>
-          <button id="compileBtn" class="primary-btn">Compile to profiler</button>
+          <div class="toolbar-row">
+            <button id="pasteLlmOutputBtn" class="ghost-btn">Paste</button>
+            <button id="compileBtn" class="primary-btn">Compile to profile</button>
+          </div>
         </div>
-        <textarea id="llmOutput" class="code-box" spellcheck="false" placeholder='{
-  "model": "epistemic_octahedron_interpreter_v1",
-  "profile": ["+.12 stability +.05 practicality \"short justification\""],
-  "evidence": []
-}'></textarea>
+        <input id="llmOutput" class="code-box llm-inline-input" spellcheck="false" placeholder='{"model":"epistemic_octahedron_interpreter_v1","evidence":[]}' />
 
         <div id="compileStatus" class="status-line" aria-live="polite"></div>
       </section>
@@ -78,7 +77,11 @@
           </div>
         </div>
 
-        <div id="avatarGrid" class="avatar-grid"></div>
+        <div class="avatar-current-wrap">
+          <button id="selectedAvatarBtn" class="avatar-btn avatar-btn-current" type="button" aria-expanded="false"></button>
+          <button id="toggleAvatarGridBtn" class="tiny-btn" type="button" aria-expanded="false">Change profile pic</button>
+        </div>
+        <div id="avatarGrid" class="avatar-grid hidden"></div>
 
         <div class="field-grid">
           <label>
@@ -129,7 +132,7 @@
       <div class="panel">
         <div class="panel-head">
           <div>
-            <h2>Profiler output</h2>
+            <h2>Profile</h2>
             <p>Deterministic aggregation with the current provisional scoring policy.</p>
           </div>
         </div>
@@ -165,11 +168,6 @@
           <div class="coord-card"><span>X</span><strong id="coordX">0.000</strong></div>
           <div class="coord-card"><span>Y</span><strong id="coordY">0.000</strong></div>
           <div class="coord-card"><span>Z</span><strong id="coordZ">0.000</strong></div>
-        </div>
-
-        <div class="diagnostics-wrap">
-          <div class="mini-head">Diagnostics</div>
-          <pre id="diagnosticsBox" class="diagnostics-box">No compile yet.</pre>
         </div>
 
         <div class="diagnostics-wrap">
