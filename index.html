@@ -54,7 +54,7 @@
             <div class="section-title">Paste LLM output</div>
             <p class="section-sub">Paste the JSON emitted by the interpreter here, then compile it through the profiler.</p>
           </div>
-          <button id="compileBtn" class="primary-btn">Compile to visualizer</button>
+          <button id="compileBtn" class="primary-btn">Compile to profiler</button>
         </div>
         <textarea id="llmOutput" class="code-box" spellcheck="false" placeholder='{
   "model": "epistemic_octahedron_interpreter_v1",
@@ -176,7 +176,7 @@
         <div class="panel-head">
           <div>
             <h2>Visualizer preview</h2>
-            <p>The main page sends final x, y, z into the standalone visualizer.</p>
+            <p>The visualizer only reads profiler-finalized data.point.{x,y,z}.</p>
           </div>
           <button id="refreshVisualizerBtn" class="ghost-btn">Re-send point</button>
         </div>

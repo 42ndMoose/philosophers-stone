@@ -49,14 +49,8 @@ const state = {
   age: '',
   selectedAvatarId: null,
   manualAvatar: false,
-  principles: [
-    'Do not confuse evidence extraction with final scoring.',
-    'Keep canon lean and reusable.',
-  ],
-  boundaries: [
-    'Do not output final x, y, z from the LLM stage.',
-    'Do not treat one text dump as final philosophical truth.',
-  ],
+  principles: [],
+  boundaries: [],
   latestCompile: null,
 };
 
@@ -260,13 +254,13 @@ function renderNotes(notes = []) {
   });
 }
 
-function postPointToVisualizer(point) {
-  const payload = { type: 'set-point', point };
-  els.visualizerFrame.contentWindow?.postMessage(payload, '*');
+function postPointToVisualizer(finalized) {
+  if (!finalized || typeof finalized !== 'object') return;
+  els.visualizerFrame.contentWindow?.postMessage({ type: 'set-profile', data: finalized }, '*');
 }
 
 function renderCompile(result, payload) {
-  const { point, semanticProfile, debug } = result;
+  const { point, semanticProfile, debug, finalized } = result;
   const uiLike = semanticProfile.uiLike;
 
   els.statEmpathy.textContent = formatPercent(uiLike.empathyPercent);
@@ -300,7 +294,7 @@ function renderCompile(result, payload) {
 
   renderAvatars();
   updateStatsAvatar();
-  postPointToVisualizer(point);
+  postPointToVisualizer(finalized);
 }
 
 function compilePayload() {
@@ -425,7 +419,7 @@ function bind() {
   els.compileBtn.addEventListener('click', () => {
     try {
       compilePayload();
-      setCompileStatus('Compiled and sent to the visualizer.', 'is-success');
+      setCompileStatus('Compiled in profiler and finalized data sent.', 'is-success');
     } catch (error) {
       setCompileStatus(error.message || 'Compile failed.', 'is-error');
     }
@@ -458,13 +452,13 @@ function bind() {
   els.resetWorkspaceBtn.addEventListener('click', resetWorkspace);
 
   els.refreshVisualizerBtn.addEventListener('click', () => {
-    const point = state.latestCompile?.result?.point;
-    if (point) postPointToVisualizer(point);
+    const finalized = state.latestCompile?.result?.finalized;
+    if (finalized) postPointToVisualizer(finalized);
   });
 
   els.visualizerFrame.addEventListener('load', () => {
-    const point = state.latestCompile?.result?.point;
-    if (point) postPointToVisualizer(point);
+    const finalized = state.latestCompile?.result?.finalized;
+    if (finalized) postPointToVisualizer(finalized);
   });
 }
 
