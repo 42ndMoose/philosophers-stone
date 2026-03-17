@@ -84,10 +84,15 @@
             <div id="avatarGrid" class="avatar-grid avatar-popup hidden" role="dialog" aria-label="Choose profile picture"></div>
           </div>
 
-          <label class="name-field">
-            <span>Name</span>
-            <input id="profileName" type="text" placeholder="Optional profile name" />
-          </label>
+          <div
+            id="profileName"
+            class="profile-name-display"
+            contenteditable="true"
+            role="textbox"
+            aria-label="Profile name"
+            spellcheck="false"
+            data-placeholder="Profile Name"
+          ></div>
         </div>
 
         <div class="field-grid profile-meta-row">
@@ -159,6 +164,7 @@
           <div class="stat-card">
             <div class="stat-label">Stability</div>
             <div id="statStability" class="stat-value">0.0%</div>
+            <div class="stat-subtext">Δ <span id="statStabilityDelta">—</span></div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Avatar</div>
