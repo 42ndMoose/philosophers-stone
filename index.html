@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Philosopher's Stone</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">Epistemic Octahedron</div>
+          <h1>Philosopher's Stone</h1>
+        </div>
+        <div class="topbar-actions">
+          <a
+            class="ghost-link"
+            href="./visualizer.html"
+            target="_blank"
+            rel="noreferrer"
+            >Open visualizer only</a
+          >
+          <button id="resetWorkspaceBtn" class="ghost-btn">
+            Reset workspace
+          </button>
+        </div>
+      </header>
+
+      <main class="workspace-grid">
+        <section class="panel panel-main">
+          <div class="panel-head panel-head-tight">
+            <div>
+              <h2>System input</h2>
+            </div>
+            <div class="toolbar-row wrap-row">
+              <button id="copyPacketBtn" class="primary-btn button-compact">
+                Copy LLM packet
+              </button>
+              <button
+                id="togglePacketPreviewBtn"
+                class="ghost-btn button-compact"
+                aria-expanded="false"
+              >
+                Show hidden packet
+              </button>
+            </div>
+          </div>
+
+          <textarea
+            id="profileText"
+            class="discord-box"
+            rows="1"
+            placeholder="Write or paste the worldview, philosophy, or raw profile text here."
+          ></textarea>
+
+          <div id="packetPreviewWrap" class="packet-preview hidden">
+            <div class="packet-toolbar">
+              <span>Generated LLM packet preview</span>
+              <button
+                id="refreshPacketBtn"
+                class="ghost-btn button-compact button-small"
+              >
+                Refresh
+              </button>
+            </div>
+            <pre id="packetPreview" class="packet-preview-box"></pre>
+          </div>
+
+          <div class="split-section">
+            <div>
+              <div class="section-title">Paste LLM output</div>
+              <p class="section-sub">
+                Paste the interpreter output, then compile it through the
+                profiler.
+              </p>
+            </div>
+            <div class="toolbar-row wrap-row">
+              <button id="pasteLlmOutputBtn" class="ghost-btn">Paste</button>
+              <button id="compileBtn" class="primary-btn">
+                Compile to profile
+              </button>
+            </div>
+          </div>
+          <input
+            id="llmOutput"
+            class="code-box llm-inline-input"
+            spellcheck="false"
+            placeholder='{"model":"epistemic_octahedron_interpreter_v1","evidence":[]}'
+          />
+
+          <div id="compileStatus" class="status-line" aria-live="polite"></div>
+        </section>
+
+        <aside class="panel side-panel">
+          <div class="panel-head stacked-gap">
+            <div>
+              <h2>Profile</h2>
+              <p>
+                Choose an avatar or let the profiler pick one after compile.
+              </p>
+            </div>
+            <div class="toolbar-row wrap-row">
+              <button id="exportProfileBtn" class="ghost-btn">
+                Export profile
+              </button>
+              <button id="importProfileBtn" class="ghost-btn">
+                Import profile
+              </button>
+              <input
+                id="importProfileInput"
+                type="file"
+                accept="application/json"
+                hidden
+              />
+            </div>
+          </div>
+
+          <div class="profile-head-row">
+            <div class="avatar-current-wrap">
+              <button
+                id="selectedAvatarBtn"
+                class="avatar-btn avatar-btn-current"
+                type="button"
+                aria-label="Current profile picture"
+              ></button>
+              <button
+                id="toggleAvatarGridBtn"
+                class="avatar-edit-btn"
+                type="button"
+                aria-label="Edit profile picture"
+                aria-expanded="false"
+              >
+                ✎
+              </button>
+              <div
+                id="avatarGrid"
+                class="avatar-grid avatar-popup hidden"
+                role="dialog"
+                aria-label="Choose profile picture"
+              ></div>
+            </div>
+
+            <div
+              id="profileName"
+              class="profile-name-display"
+              contenteditable="true"
+              role="textbox"
+              aria-label="Profile name"
+              spellcheck="false"
+              data-placeholder="Profile Name"
+            ></div>
+          </div>
+
+          <div class="field-grid profile-meta-row">
+            <label>
+              <input
+                id="profileAdditionalInfo"
+                type="text"
+                placeholder="Additional info eg. age, gender, persona"
+              />
+            </label>
+          </div>
+
+          <div class="stats-shell">
+            <div class="mini-head">Profiler</div>
+            <div class="stats-grid compact-stats-grid">
+              <div class="stat-card">
+                <div class="stat-label">Empathy</div>
+                <div id="statEmpathy" class="stat-value">50.0%</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Practicality</div>
+                <div id="statPracticality" class="stat-value">50.0%</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Wisdom</div>
+                <div id="statWisdom" class="stat-value">50.0%</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Knowledge</div>
+                <div id="statKnowledge" class="stat-value">50.0%</div>
+              </div>
+              <div class="stat-card stat-card-wide">
+                <div class="stat-label">Stability</div>
+                <div id="statStability" class="stat-value">0.0%</div>
+                <div class="stat-subtext">
+                  Δ <span id="statStabilityDelta">—</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="coord-grid compact-coord-grid">
+              <div class="coord-card">
+                <span>X</span><strong id="coordX">0.000</strong>
+              </div>
+              <div class="coord-card">
+                <span>Y</span><strong id="coordY">0.000</strong>
+              </div>
+              <div class="coord-card">
+                <span>Z</span><strong id="coordZ">0.000</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="diagnostics-wrap">
+            <div class="section-title">Profile entries</div>
+            <ul id="profileEntriesList" class="profile-list">
+              <li>No profile entry yet.</li>
+            </ul>
+          </div>
+
+          <div class="canon-wrap">
+            <div class="section-title">Canon</div>
+            <p class="section-sub">
+              Each layer is its own column. Drag items to reorder within that
+              same layer.
+            </p>
+
+            <div class="add-row wrap-row canon-add-row">
+              <input
+                id="canonInput"
+                type="text"
+                placeholder="Add a principle or boundary"
+              />
+              <select id="canonType">
+                <option value="principles">Principle</option>
+                <option value="boundaries">Boundary</option>
+              </select>
+              <select id="canonLayer">
+                <option value="core">Core</option>
+                <option value="supporting">Supporting</option>
+                <option value="conditional">Conditional</option>
+              </select>
+              <button id="addCanonBtn" class="ghost-btn">Add</button>
+            </div>
+
+            <div class="canon-group">
+              <div class="mini-head">Principles</div>
+              <div class="canon-columns three-up">
+                <section>
+                  <div class="mini-head">Core</div>
+                  <ul
+                    id="principlesList-core"
+                    class="canon-list"
+                    data-list-type="principles"
+                    data-layer-key="core"
+                  ></ul>
+                </section>
+                <section>
+                  <div class="mini-head">Supporting</div>
+                  <ul
+                    id="principlesList-supporting"
+                    class="canon-list"
+                    data-list-type="principles"
+                    data-layer-key="supporting"
+                  ></ul>
+                </section>
+                <section>
+                  <div class="mini-head">Conditional</div>
+                  <ul
+                    id="principlesList-conditional"
+                    class="canon-list"
+                    data-list-type="principles"
+                    data-layer-key="conditional"
+                  ></ul>
+                </section>
+              </div>
+            </div>
+
+            <div class="canon-group">
+              <div class="mini-head">Boundaries</div>
+              <div class="canon-columns three-up">
+                <section>
+                  <div class="mini-head">Core</div>
+                  <ul
+                    id="boundariesList-core"
+                    class="canon-list"
+                    data-list-type="boundaries"
+                    data-layer-key="core"
+                  ></ul>
+                </section>
+                <section>
+                  <div class="mini-head">Supporting</div>
+                  <ul
+                    id="boundariesList-supporting"
+                    class="canon-list"
+                    data-list-type="boundaries"
+                    data-layer-key="supporting"
+                  ></ul>
+                </section>
+                <section>
+                  <div class="mini-head">Conditional</div>
+                  <ul
+                    id="boundariesList-conditional"
+                    class="canon-list"
+                    data-list-type="boundaries"
+                    data-layer-key="conditional"
+                  ></ul>
+                </section>
+              </div>
+            </div>
+          </div>
+
+          <div class="toolbar-row wrap-row footer-actions">
+            <button id="copyProfilerAssessmentBtn" class="ghost-btn">
+              Copy profiler assessment
+            </button>
+          </div>
+        </aside>
+      </main>
+
+      <section class="results-grid">
+        <div class="panel visualizer-panel">
+          <div class="panel-head panel-head-tight">
+            <div>
+              <h2>Visualizer</h2>
+            </div>
+            <button id="refreshVisualizerBtn" class="ghost-btn">Apply</button>
+          </div>
+          <iframe
+            id="visualizerFrame"
+            class="visualizer-frame"
+            src="./visualizer.html"
+            title="Epistemic Octahedron Visualizer"
+          ></iframe>
+        </div>
+      </section>
+    </div>
+
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>
