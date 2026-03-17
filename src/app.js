@@ -35,6 +35,7 @@ const els = {
   statWisdom: document.getElementById('statWisdom'),
   statKnowledge: document.getElementById('statKnowledge'),
   statStability: document.getElementById('statStability'),
+  statStabilityDelta: document.getElementById('statStabilityDelta'),
   statAvatar: document.getElementById('statAvatar'),
   coordX: document.getElementById('coordX'),
   coordY: document.getElementById('coordY'),
@@ -343,6 +344,7 @@ function renderCompile(result, payload) {
   els.statWisdom.textContent = formatPercent(uiLike.wisdomPercent);
   els.statKnowledge.textContent = formatPercent(uiLike.knowledgePercent);
   els.statStability.textContent = formatPercent(uiLike.stabilityPercent);
+  renderStabilityDelta();
   els.coordX.textContent = formatCoord(point.x);
   els.coordY.textContent = formatCoord(point.y);
   els.coordZ.textContent = formatCoord(point.z);
@@ -355,13 +357,24 @@ function renderCompile(result, payload) {
     if (picked && !state.name.trim() && !state.selectedAvatarId) {
       state.selectedAvatarId = picked.id;
       state.name = picked.title;
-      els.profileName.value = state.name;
+      els.profileName.textContent = state.name;
     }
   }
 
   renderAvatars();
   updateStatsAvatar();
   postPointToVisualizer(finalized);
+}
+
+
+function renderStabilityDelta() {
+  const delta = Number(state.latestCompile?.stabilityDelta);
+  if (!Number.isFinite(delta)) {
+    els.statStabilityDelta.textContent = '—';
+    return;
+  }
+  const sign = delta >= 0 ? '+' : '';
+  els.statStabilityDelta.textContent = `${sign}${delta.toFixed(1)}%`;
 }
 
 function extractCanonFromText(rawText = '') {
@@ -411,6 +424,7 @@ function parseLLMOutput(raw) {
 }
 
 function compilePayload() {
+  const previousCompile = state.latestCompile;
   const raw = sanitizeJSONInput(state.llmOutput);
   if (!raw) {
     throw new Error('Paste LLM output before compiling.');
@@ -437,10 +451,17 @@ function compilePayload() {
 
   state.compiledPayloads.push(payload);
 
+  const previousStability = Number(previousCompile?.result?.semanticProfile?.uiLike?.stabilityPercent);
+  const nextStability = Number(result?.semanticProfile?.uiLike?.stabilityPercent);
+  const stabilityDelta = Number.isFinite(previousStability) && Number.isFinite(nextStability)
+    ? nextStability - previousStability
+    : null;
+
   state.latestCompile = {
     payload,
     result,
     stackedProfileEntries,
+    stabilityDelta,
     compiledAt: new Date().toISOString(),
   };
 
@@ -493,7 +514,7 @@ function renderAll() {
   });
   els.profileText.value = state.profileText || '';
   els.llmOutput.value = state.llmOutput || '';
-  els.profileName.value = state.name || '';
+  els.profileName.textContent = state.name || '';
   els.profileAge.value = state.age || '';
   autoResizeTextarea(els.profileText);
   renderAvatars();
@@ -506,6 +527,7 @@ function renderAll() {
   } else {
     renderNotes([]);
     renderProfileEntries([]);
+    renderStabilityDelta();
   }
 }
 
@@ -525,10 +547,16 @@ function bind() {
     saveState();
   });
 
-  els.profileName.addEventListener('input', () => {
-    state.name = els.profileName.value;
+  const syncProfileName = () => {
+    state.name = els.profileName.textContent.trim();
     renderPacketPreview();
     saveState();
+  };
+
+  els.profileName.addEventListener('input', syncProfileName);
+  els.profileName.addEventListener('blur', () => {
+    els.profileName.textContent = els.profileName.textContent.trim();
+    syncProfileName();
   });
 
   els.profileAge.addEventListener('input', () => {
