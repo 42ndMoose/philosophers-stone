@@ -396,7 +396,6 @@ h2 {
   top: 118px;
   left: 0;
   width: 248px;
-  display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   padding: 10px;
@@ -404,6 +403,10 @@ h2 {
   background: rgba(10, 14, 21, 0.96);
   border: 1px solid var(--line);
   z-index: 4;
+}
+
+.avatar-popup:not(.hidden) {
+  display: grid;
 }
 
 .avatar-option-btn {
