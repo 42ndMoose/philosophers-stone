@@ -640,14 +640,19 @@ function bind() {
   els.selectedAvatarBtn.addEventListener('click', toggleAvatarPicker);
 
 
-  document.addEventListener('click', (event) => {
-    if (!state.avatarPickerOpen) return;
-    const target = event.target;
-    if (els.avatarGrid.contains(target) || els.toggleAvatarGridBtn.contains(target)) return;
-    state.avatarPickerOpen = false;
-    renderAvatars();
-    saveState();
-  });
+document.addEventListener('click', (event) => {
+  if (!state.avatarPickerOpen) return;
+  const target = event.target;
+  if (
+    els.avatarGrid.contains(target) ||
+    els.toggleAvatarGridBtn.contains(target) ||
+    els.selectedAvatarBtn.contains(target)
+  ) return;
+
+  state.avatarPickerOpen = false;
+  renderAvatars();
+  saveState();
+});
 
   els.refreshVisualizerBtn.addEventListener('click', () => {
     const finalized = state.latestCompile?.result?.finalized;
