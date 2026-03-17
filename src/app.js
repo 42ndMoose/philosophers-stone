@@ -630,11 +630,14 @@ function bind() {
     }
   });
 
-  els.toggleAvatarGridBtn.addEventListener('click', () => {
+  const toggleAvatarPicker = () => {
     state.avatarPickerOpen = !state.avatarPickerOpen;
     renderAvatars();
     saveState();
-  });
+  };
+
+  els.toggleAvatarGridBtn.addEventListener('click', toggleAvatarPicker);
+  els.selectedAvatarBtn.addEventListener('click', toggleAvatarPicker);
 
 
   document.addEventListener('click', (event) => {
