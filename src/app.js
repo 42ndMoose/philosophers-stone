@@ -9,7 +9,7 @@ import {
 import { AVATARS, getAvatarById, pickAvatarFromPoint } from "./avatars.js";
 import { EpistemicProfiler } from "./profiler.js";
 
-const STORAGE_KEY = "philosophers-stone-workspace-v3";
+const STORAGE_KEY = "philosophers-stone-workspace-v4";
 const BUTTON_RESET_MS = 1500;
 const DIAMOND_RANGE_PERCENT = 34;
 
@@ -67,7 +67,7 @@ const els = {
   },
 };
 
-const profiler = new EpistemicProfiler({ rejectBalancedNonPole: false });
+const profiler = new EpistemicProfiler();
 
 function buildEmptyCanonState() {
   return {
@@ -393,11 +393,54 @@ function cleanStringList(items = []) {
     .filter(Boolean);
 }
 
+function countStructuredSignals(payload = {}) {
+  const axisEvents = payload.axis_events || {};
+  const localExtraction = payload.local_extraction || {};
+  const profileUpdates = payload.profile_update_signals || {};
+
+  return (
+    (Array.isArray(payload.evidence) ? payload.evidence.length : 0) +
+    EpistemicProfiler.parseCompactProfileSignals(cleanStringList(payload.profile || [])).length +
+    (Array.isArray(axisEvents.x_pole_evidence) ? axisEvents.x_pole_evidence.length : 0) +
+    (Array.isArray(axisEvents.x_integration_events) ? axisEvents.x_integration_events.length : 0) +
+    (Array.isArray(axisEvents.z_pole_evidence) ? axisEvents.z_pole_evidence.length : 0) +
+    (Array.isArray(axisEvents.z_integration_events) ? axisEvents.z_integration_events.length : 0) +
+    (Array.isArray(payload.local_y_positive_signals)
+      ? payload.local_y_positive_signals.length
+      : 0) +
+    (Array.isArray(payload.local_y_negative_signals)
+      ? payload.local_y_negative_signals.length
+      : 0) +
+    (Array.isArray(payload.triggered_gate_events)
+      ? payload.triggered_gate_events.length
+      : 0) +
+    (Array.isArray(localExtraction.principles) ? localExtraction.principles.length : 0) +
+    (Array.isArray(localExtraction.boundaries) ? localExtraction.boundaries.length : 0) +
+    (Array.isArray(localExtraction.claimed_values)
+      ? localExtraction.claimed_values.length
+      : 0) +
+    (Array.isArray(localExtraction.tradeoffs) ? localExtraction.tradeoffs.length : 0) +
+    (Array.isArray(localExtraction.contradictions)
+      ? localExtraction.contradictions.length
+      : 0) +
+    (Array.isArray(profileUpdates.new_principles)
+      ? profileUpdates.new_principles.length
+      : 0) +
+    (Array.isArray(profileUpdates.new_boundaries)
+      ? profileUpdates.new_boundaries.length
+      : 0) +
+    (Array.isArray(profileUpdates.cleared_gates)
+      ? profileUpdates.cleared_gates.length
+      : 0) +
+    (Array.isArray(profileUpdates.failed_gates)
+      ? profileUpdates.failed_gates.length
+      : 0)
+  );
+}
+
 function payloadHasScorableSignals(payload = {}) {
   if (!payload || typeof payload !== "object") return false;
-  if (Array.isArray(payload.evidence) && payload.evidence.length) return true;
-  const profile = cleanStringList(payload.profile || []);
-  return EpistemicProfiler.parseCompactProfileSignals(profile).length > 0;
+  return countStructuredSignals(payload) > 0;
 }
 
 function setListCount(element, count, singularLabel, pluralLabel) {
@@ -543,21 +586,51 @@ function parseLoosePayload(raw) {
   const profile = extractLooseProfileItems(repaired);
   const evidence = parseLooseArrayByKey(repaired, "evidence") || [];
   const notes = parseLooseArrayByKey(repaired, "notes") || [];
+  const axis_events = parseLooseObjectByKey(repaired, "axis_events") || {};
+  const local_extraction = parseLooseObjectByKey(repaired, "local_extraction") || {};
+  const profile_update_signals =
+    parseLooseObjectByKey(repaired, "profile_update_signals") || {};
+  const triggered_gate_events =
+    parseLooseArrayByKey(repaired, "triggered_gate_events") || [];
+  const local_y_positive_signals =
+    parseLooseArrayByKey(repaired, "local_y_positive_signals") || [];
+  const local_y_negative_signals =
+    parseLooseArrayByKey(repaired, "local_y_negative_signals") || [];
   const canonUpdate =
     parseLooseObjectByKey(repaired, "canonUpdate") ||
     parseLooseObjectByKey(repaired, "canon_update") ||
     parseLooseObjectByKey(repaired, "canonOptimization") ||
     parseLooseObjectByKey(repaired, "canon_optimization");
 
-  if (!profile.length && !evidence.length && !notes.length && !canonUpdate) {
+  const hasAnything =
+    profile.length ||
+    evidence.length ||
+    notes.length ||
+    triggered_gate_events.length ||
+    countStructuredSignals({
+      axis_events,
+      local_extraction,
+      profile_update_signals,
+      local_y_positive_signals,
+      local_y_negative_signals,
+    }) ||
+    canonUpdate;
+
+  if (!hasAnything) {
     return null;
   }
 
   const payload = {
-    model: modelMatch?.[1] || "epistemic_octahedron_interpreter_v1",
+    model: modelMatch?.[1] || "epistemic_octahedron_interpreter_v2",
     profile,
     evidence,
     notes: cleanStringList(notes),
+    axis_events,
+    local_extraction,
+    profile_update_signals,
+    triggered_gate_events,
+    local_y_positive_signals,
+    local_y_negative_signals,
   };
 
   if (canonUpdate) {
@@ -600,27 +673,50 @@ function extractCanonFromText(rawText = "") {
   };
 }
 
+function normalizeParsedPayload(parsed = {}) {
+  return {
+    ...parsed,
+    model: parsed.model || "epistemic_octahedron_interpreter_v2",
+    profile: cleanStringList(parsed.profile || []),
+    evidence: Array.isArray(parsed.evidence) ? parsed.evidence : [],
+    notes: cleanStringList(parsed.notes || []),
+    analysis_scope: parsed.analysis_scope || parsed.analysisScope,
+    scope_strength: parsed.scope_strength || parsed.scopeStrength,
+    statement_modes: Array.isArray(parsed.statement_modes)
+      ? parsed.statement_modes
+      : Array.isArray(parsed.statementModes)
+        ? parsed.statementModes
+        : [],
+    axis_events: parsed.axis_events || parsed.axisEvents || {},
+    local_extraction: parsed.local_extraction || parsed.localExtraction || {},
+    profile_update_signals:
+      parsed.profile_update_signals || parsed.profileUpdateSignals || {},
+    local_y_positive_signals:
+      parsed.local_y_positive_signals || parsed.localYPositiveSignals || [],
+    local_y_negative_signals:
+      parsed.local_y_negative_signals || parsed.localYNegativeSignals || [],
+    triggered_gate_events:
+      parsed.triggered_gate_events || parsed.triggeredGateEvents || [],
+    canonUpdate: parsed.canonUpdate || parsed.canon_update,
+    canonOptimization:
+      parsed.canonOptimization || parsed.canon_optimization || undefined,
+    principlesByLayer: parsed.principlesByLayer || parsed.principles_by_layer,
+    boundariesByLayer: parsed.boundariesByLayer || parsed.boundaries_by_layer,
+    principles: parsed.principles,
+    boundaries: parsed.boundaries,
+    canonUpdates: parsed.canonUpdates || parsed.canon_updates,
+    updates: parsed.updates,
+  };
+}
+
 function parseLLMOutput(raw) {
-  const parsed = tryParseJSON(raw) || tryParseJSON(repairLikelyPayload(raw)) || parseLoosePayload(raw);
+  const parsed =
+    tryParseJSON(raw) || tryParseJSON(repairLikelyPayload(raw)) || parseLoosePayload(raw);
   const canonFromText = extractCanonFromText(raw);
 
   if (parsed && typeof parsed === "object") {
     return {
-      payload: {
-        model: parsed.model || "epistemic_octahedron_interpreter_v1",
-        profile: cleanStringList(parsed.profile || []),
-        evidence: Array.isArray(parsed.evidence) ? parsed.evidence : [],
-        notes: cleanStringList(parsed.notes || []),
-        canonUpdate: parsed.canonUpdate || parsed.canon_update,
-        canonOptimization:
-          parsed.canonOptimization || parsed.canon_optimization || undefined,
-        principlesByLayer: parsed.principlesByLayer || parsed.principles_by_layer,
-        boundariesByLayer: parsed.boundariesByLayer || parsed.boundaries_by_layer,
-        principles: parsed.principles,
-        boundaries: parsed.boundaries,
-        canonUpdates: parsed.canonUpdates || parsed.canon_updates,
-        updates: parsed.updates,
-      },
+      payload: normalizeParsedPayload(parsed),
       canonFromText,
     };
   }
@@ -628,10 +724,16 @@ function parseLLMOutput(raw) {
   const profile = extractLooseProfileItems(raw);
   return {
     payload: {
-      model: "epistemic_octahedron_interpreter_v1",
+      model: "epistemic_octahedron_interpreter_v2",
       profile,
       evidence: [],
       notes: [],
+      axis_events: {},
+      local_extraction: {},
+      profile_update_signals: {},
+      local_y_positive_signals: [],
+      local_y_negative_signals: [],
+      triggered_gate_events: [],
     },
     canonFromText,
   };
@@ -887,7 +989,7 @@ function buildMathDump(result) {
   const finalizedData = result?.finalized?.data || {};
   const point = finalizedData.point || { x: 0, y: 0, z: 0 };
   const params = finalizedData.params || {};
-  const semantics = params.semantics || { a: 0, b: 0, s: 0 };
+  const semantics = params.semantics || { a: 0, b: 0, s: 0, yCoverage: 0 };
   const uiLike = params.uiLike || {};
   const diagnostics = finalizedData.diagnostics || {};
   const math = finalizedData.math || {};
@@ -897,32 +999,28 @@ function buildMathDump(result) {
     `  a: ${formatSigned(semantics.a)},`,
     `  b: ${formatSigned(semantics.b)},`,
     `  s: ${formatSigned(semantics.s)},`,
+    `  yCoverage: ${formatPercent((semantics.yCoverage || 0) * 100)},`,
     `  empathyPercent: ${formatPercent(uiLike.empathyPercent ?? 50)},`,
     `  practicalityPercent: ${formatPercent(uiLike.practicalityPercent ?? 50)},`,
     `  wisdomPercent: ${formatPercent(uiLike.wisdomPercent ?? 50)},`,
     `  knowledgePercent: ${formatPercent(uiLike.knowledgePercent ?? 50)},`,
     `  stabilityPercent: ${formatPercent(uiLike.stabilityPercent ?? 0)},`,
+    `  coveragePercent: ${formatPercent(uiLike.coveragePercent ?? 0)},`,
     `  x: ${formatCoord(point.x)},`,
     `  y: ${formatCoord(point.y)},`,
     `  z: ${formatCoord(point.z)}`,
     "}",
     "",
-    "accumulation = compiled evidence is summed across every stored entry and then clamped by per-axis saturation.",
-    "compact_profile_rule = compact profile values only affect scoring on payloads that do not also include an evidence array.",
-    "display_rule = profile entry ordering and dedupe are UI and report conveniences only and do not change scoring.",
-    "",
     "latex = [",
-    `  ${JSON.stringify(math.formulas?.axisAggregation || String.raw`raw_{axis} = \operatorname{clamp}\left(\frac{\sum signed\_evidence + \sum compact\_signals\_when\_no\_evidence}{saturation}, -1, 1\right)`)},`,
-    `  ${JSON.stringify(math.formulas?.projection || String.raw`x = \frac{a}{|a| + |b|}(1-|s|),\quad y = s,\quad z = \frac{b}{|a| + |b|}(1-|s|)`)},`,
-    `  ${JSON.stringify(math.formulas?.poleRule || String.raw`|s| = 1 \Rightarrow (x,y,z) = (0, \operatorname{sign}(s), 0)`)},`,
-    `  ${JSON.stringify(math.formulas?.surfaceRule || String.raw`|x| + |y| + |z| = 1`)}`,
+    `  ${JSON.stringify(math.formulas?.axisAggregation || "")},`,
+    `  ${JSON.stringify(math.formulas?.yEstimate || "")},`,
+    `  ${JSON.stringify(math.formulas?.yCoverage || "")},`,
+    `  ${JSON.stringify(math.formulas?.projection || "")},`,
+    `  ${JSON.stringify(math.formulas?.originRule || "")},`,
+    `  ${JSON.stringify(math.formulas?.surfaceRule || "")}`,
     "]",
     "",
-    "diagnostics = {",
-    `  empathyPracticality: ${JSON.stringify(diagnostics.empathyPracticality || {}, null, 2)},`,
-    `  wisdomKnowledge: ${JSON.stringify(diagnostics.wisdomKnowledge || {}, null, 2)},`,
-    `  epistemicStability: ${JSON.stringify(diagnostics.epistemicStability || {}, null, 2)}`,
-    "}",
+    "diagnostics = " + JSON.stringify(diagnostics, null, 2),
     "",
     "sources = " + JSON.stringify(math.sources || {}, null, 2),
   ].join("\n");
@@ -1026,7 +1124,7 @@ function compilePayload() {
     };
   } else if (!hadCanonSignals) {
     throw new Error(
-      'LLM payload must contain usable evidence, compact profile signals, or a canon update.',
+      'LLM payload must contain usable evidence, structured signals, compact profile signals, or a canon update.',
     );
   }
 

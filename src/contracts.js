@@ -1,348 +1,270 @@
 const CANON_LAYER_KEYS = ["core", "supporting", "conditional"];
 
 const CORE_CONTRACT = `EPISTEMIC OCTAHEDRON INTERPRETER CONTRACT
-version: 3.2
+version: 4.0
 
 PURPOSE
-This contract helps the LLM understand what the visualizer represents, what the axes mean, and what kind of semantic extraction the profiler can use.
-This contract does NOT authorize the LLM to compute final scores or final plot coordinates.
+This contract tells the LLM what the Epistemic Octahedron models and what kind of extraction the profiler can use.
+The LLM is an extractor only.
+It does not compute final scores, final maturity percentages, or final x y z coordinates.
 
 PIPELINE
 System -> LLM -> Profiler -> Visualizer
 
 1. System
-Gives the user:
-- the framework
-- the input instructions
+Provides:
+- the user's current text
 - this interpreter contract
-- the JSON output format the LLM must follow
+- the current layered canon
+- the JSON output shape
 
 2. LLM
-Reads:
-- the user's profile input
-- this interpreter contract
-- the current layered canon context
-
-The LLM's job is to interpret the user's text semantically and emit structured output the profiler can use.
+Reads the text semantically.
+It extracts portable structure.
+It does not do final scoring.
 
 3. Profiler
-Receives the LLM output.
-The profiler is the mathematical and scoring authority.
-It stores, weighs, aggregates, filters, and computes final semantic values and final xyz coordinates.
+Receives structured extraction.
+The profiler stores, weighs, merges, filters, and computes semantic params and the final projected point.
 
 4. Visualizer
-Receives only finalized profiler data and plots the final point.
+Receives only finalized profiler data.
 
 GEOMETRIC REFERENCE
-The visualizer is an octahedron in 3D space.
-Surface equation for committed plots:
-|x| + |y| + |z| = 1
-Center: (0, 0, 0)
-
-The LLM does not need to imagine this shape visually.
-The geometry is included only so the LLM understands what the profiler and visualizer are modeling.
-
-EPISTEMIC OCTAHEDRON CONTEXTUALIZER
-A philosophy, worldview, thought, or mind-state is plotted as a 3D point on the surface of an octahedron.
-
-SURFACE RULE
-Actual plotted states lie on:
+Active worldview positions are projected onto the octahedron surface:
 |x| + |y| + |z| = 1
 
-The only temporary exception is the reset state at the true center:
-(0, 0, 0)
+Axis signs are fixed:
+- x < 0 = Practicality
+- x > 0 = Empathy
+- z < 0 = Knowledge
+- z > 0 = Wisdom
+- y < 0 = Negative Epistemic Stability
+- y = 0 = Epistemic Borderline
+- y > 0 = Positive Epistemic Stability
 
-That center is just the neutral pre-interaction start state.
-Once the visualizer is engaged, the point is surface-locked.
+NULL STATE AND COLLAPSE
+The coordinate origin (0, 0, 0) is the pre-philosophical null state.
+It represents no active worldview strong enough to plot on the surface.
+One example is infancy, but the idea is broader than age.
 
-AXES
-x-axis
-- negative = Practicality
-- positive = Empathy
+The lower vertex (0, -1, 0) is epistemic collapse.
+It is not the same thing as the null state.
+It is an active negative condition.
 
-z-axis
-- negative = Knowledge
-- positive = Wisdom
+The upper vertex (0, 1, 0) is objective peak philosophical maturity.
+That means the four lateral tensions have been considered and integrated under positive epistemic stability.
 
-y-axis
-- negative = Negative Epistemic Stability
-- zero = Epistemic Borderline
-- positive = Positive Epistemic Stability
-
-STRICT SIGN RULE
-The sign decides the side.
-Magnitude decides strength.
-
-- any positive x = Empathy side
-- any negative x = Practicality side
-- any positive z = Wisdom side
-- any negative z = Knowledge side
-- any positive y = Positive Epistemic Stability
-- any negative y = Negative Epistemic Stability
-
-DEFINITIONS
-Epistemic stability:
-The degree to which a mind can orient itself toward reality in a self-corrective, truth-convergent way.
-
-Positive epistemic stability:
-A state where the mind reduces distortion, corrects error, integrates well, and moves toward reality.
-
-Negative epistemic stability:
-A state where the mind cannot reliably orient itself toward reality, whether because it is undeveloped, dependent, impaired, distorted, or corrupted.
-
-Epistemic borderline:
-The equator, where y = 0.
-This is the dividing line between net truth-convergence and net non-convergence.
-
-ALL-AGES INTERPRETATION
-This graph is for all ages, not just developed adults.
-Negative epistemic stability does not only mean adult-style distortion, contradiction, motivated reasoning, or self-sealing falsehood.
-It can also mean epistemic non-formation.
-That means a mindless infant can be placed at or near:
-(0, -1, 0)
-not because the infant is blameworthy or deceptive, but because it is maximally undeveloped in self-directed truth-orientation.
-
-So the lower pole includes different cases that share the same structural condition for different reasons, such as:
-- innocent non-formation, like an infant
-- impairment or severe incapacity
-- mature but corrupted cognition
-
-The graph tracks epistemic condition, not moral blame.
-
-LATERAL AXIS MEANINGS
+CORE SEMANTIC DIMENSIONS
 Empathy:
-human-centered concern, felt impact, compassion, moral sensitivity, relational weighting
+- human concern
+- relational weighting
+- felt impact
+- moral sensitivity
 
 Practicality:
-utility, feasibility, efficiency, logistics, constraints, instrumental reasoning
+- feasibility
+- logistics
+- instrumental constraints
+- utility under pressure
 
 Wisdom:
-judgment, synthesis, proportion, context, deeper interpretation
+- judgment
+- synthesis
+- proportion
+- context-sensitive understanding
 
 Knowledge:
-facts, recall, technical detail, literal precision, information storage
+- facts
+- literal precision
+- technical detail
+- information grasp
 
-IMPORTANT NEGATIVE-SIDE RULE
-The lateral directions still exist below the borderline, but in degraded or immature form.
-Examples:
-- negative-side empathy can appear as false empathy, selective compassion, or emotional distortion
-- negative-side practicality can appear as crude expediency or dehumanized utility
-- negative-side wisdom can appear as pseudo-wisdom or inflated false depth
-- negative-side knowledge can appear as sterile fact-hoarding or misused precision
+Epistemic stability:
+- reality contact
+- coherence
+- self-correction
+- resistance to self-sealing distortion
 
-But for very early or undeveloped minds, the lower region can simply reflect lack of formation rather than corruption.
+LLM EXTRACTION RULES
+1. Extract structure, not final verdicts.
+2. Prefer under-calling over over-calling.
+3. Every meaningful extraction should carry evidence_span when possible.
+4. Only emit triggered gate events when the text gives actual evidence for or against a gate.
+5. Silence is neutral. Do not output gate statuses for absence.
+6. Do not emit final percentages, maturity scores, or coordinates.
+7. The current profile name is display-only context and should not bias interpretation.
+8. The canon is editable memory, not sacred text.
 
-OBJECTIVE PEAK MATURITY
-The top pole is the objective peak maturity:
-(0, 1, 0)
+SCOPE CLASSIFICATION
+Always classify the input as one of:
+- thought
+- stance
+- worldview_fragment
+- full_profile_import
 
-At full positive epistemic stability, the four lateral aspects no longer compete against each other as unresolved tensions.
-They become properly integrated under reality-tracking maturity.
+Also emit scope_strength as:
+- low
+- medium
+- high
 
-GEOMETRIC REFERENCE
-Pure extremes:
-- Empathy = ( 1, 0, 0)
-- Practicality = (-1, 0, 0)
-- Wisdom = ( 0, 0, 1)
-- Knowledge = ( 0, 0, -1)
-- Positive Epistemic Stability = ( 0, 1, 0)
-- Negative Epistemic Stability = ( 0, -1, 0)
+STATEMENT MODES
+You may emit one or more of:
+- literal_claim
+- analogy
+- rhetorical_generalization
+- norm
+- self_description
 
-Equator examples where y = 0:
-- full Empathy + Wisdom = ( 0.500, 0.000, 0.500)
-- full Empathy + Knowledge = ( 0.500, 0.000, -0.500)
-- full Practicality + Wisdom = (-0.500, 0.000, 0.500)
-- full Practicality + Knowledge = (-0.500, 0.000, -0.500)
+LOCAL EXTRACTION
+local_extraction may include:
+- principles
+- boundaries
+- claimed_values
+- tradeoffs
+- contradictions
 
-CURRENT PROFILER RULE
-The profiler can compile from either:
-- structured evidence items
-- compact profile signals inside the profile line
+Each extracted item should be normalized and supported by an evidence span when possible.
 
-Compact profile signals look like:
-- +.18 stability
-- +.10 wisdom
-- -.07 practicality
+AXIS EVENTS
+Do not emit final x or z scores.
+Emit evidence instead.
 
-Evidence is preferred when available because it preserves nuance.
-But the system must still be compilable from compact profile signals alone.
+For x axis:
+- x_pole_evidence with pole = empathy or practicality
+- x_integration_events with type = explicit_balance or fair_tradeoff or integrated_tension
 
-LLM TASK
-From the user's text, extract semantic signals for:
-1. empathy vs practicality
-2. wisdom vs knowledge
-3. epistemic stability direction
+For z axis:
+- z_pole_evidence with pole = wisdom or knowledge
+- z_integration_events with type = explicit_balance or fair_tradeoff or integrated_tension
 
-The LLM should not output final percentages, final coordinates, or final profile scores.
-The LLM should instead output:
-- evidence items when there is usable semantic evidence
-- a compact profile line as a short summary
-- and both when both are helpful
+LOCAL Y SIGNALS
+Emit local epistemic-stability signals from the current input only.
 
-AXIS NAMES FOR OUTPUT
-Use exactly these axis values:
-- "empathyPracticality"
-- "wisdomKnowledge"
-- "epistemicStability"
+Positive signal types may include:
+- counter_consideration
+- self_correction
+- reality_contact
+- coherence
+- error_awareness
+- revision_openness
+- non_strawman_fairness
 
-DIRECTION VALUES
-For axis = "empathyPracticality":
-- "empathy"
-- "practicality"
-- "mixed"
-- "unclear"
+Negative signal types may include:
+- false_certainty
+- self_sealing
+- contradiction_evasion
+- reality_detachment
+- dogmatic_closure
+- collapse_marker
+- strawman_dependence
+- broad_motive_attribution
 
-For axis = "wisdomKnowledge":
-- "wisdom"
-- "knowledge"
-- "mixed"
-- "unclear"
+META-EPISTEMIC GATES
+Use only these six gates:
+- G1_counter_consideration
+- G2_non_strawman
+- G3_self_correction
+- G4_contradiction_handling
+- G5_reality_contact
+- G6_non_self_sealing
 
-For axis = "epistemicStability":
-- "positive"
-- "negative"
-- "mixed"
-- "unclear"
+Only emit triggered_gate_events when the text gives real evidence.
+Each event must include:
+- gate
+- direction = positive or negative
+- strength = weak moderate or strong
+- confidence from 0.5 to 1.0
+- novelty from 0.0 to 1.0 when possible
+- evidence_span
 
-STRENGTH VALUES
-Use exactly one of:
-- "weak"
-- "moderate"
-- "strong"
+PROFILE UPDATE SIGNALS
+profile_update_signals may include:
+- new_principles
+- refined_principles
+- new_boundaries
+- refined_boundaries
+- resolved_contradictions
+- introduced_contradictions
+- cleared_gates
+- failed_gates
+- retractions
+- restatements
 
-CONFIDENCE
-confidence must be a decimal from 0 to 1.
-
-EVIDENCE ITEM FORMAT
-Each evidence item must follow this shape:
-{
-  "axis": "empathyPracticality | wisdomKnowledge | epistemicStability",
-  "direction": "allowed direction for that axis",
-  "strength": "weak | moderate | strong",
-  "confidence": 0.0 to 1.0,
-  "reason": "short explanation of why this evidence was identified",
-  "excerpt": "optional short supporting excerpt from the user's text"
-}
+OPTIONAL CANON UPDATE
+If the current canon clearly needs maintenance, refinement, replacement, or dedupe, you may include canonUpdate.
+If you include principlesByLayer or boundariesByLayer, output the full next state for that section.
+Keep the canon lean.
 
 REQUIRED JSON SHAPE
 {
-  "model": "epistemic_octahedron_interpreter_v1",
+  "model": "epistemic_octahedron_interpreter_v2",
+  "analysis_scope": "thought | stance | worldview_fragment | full_profile_import",
+  "scope_strength": "low | medium | high",
+  "statement_modes": [],
   "profile": [
-    "+.12 stability +.05 practicality | short justification"
+    "+.18 stability -.08 practicality | short justification"
   ],
-  "evidence": [
-    {
-      "axis": "empathyPracticality",
-      "direction": "empathy",
-      "strength": "moderate",
-      "confidence": 0.82,
-      "reason": "The text gives clear moral weight to human impact and concern for others",
-      "excerpt": "optional short excerpt"
+  "local_extraction": {
+    "principles": [],
+    "boundaries": [],
+    "claimed_values": [],
+    "tradeoffs": [],
+    "contradictions": []
+  },
+  "axis_events": {
+    "x_pole_evidence": [],
+    "x_integration_events": [],
+    "z_pole_evidence": [],
+    "z_integration_events": []
+  },
+  "local_y_positive_signals": [],
+  "local_y_negative_signals": [],
+  "triggered_gate_events": [],
+  "profile_update_signals": {
+    "new_principles": [],
+    "refined_principles": [],
+    "new_boundaries": [],
+    "refined_boundaries": [],
+    "resolved_contradictions": [],
+    "introduced_contradictions": [],
+    "cleared_gates": [],
+    "failed_gates": [],
+    "retractions": [],
+    "restatements": []
+  },
+  "notes": [],
+  "canonUpdate": {
+    "action": "maintain | replace | update | add | obsolete | refine",
+    "principlesByLayer": {
+      "core": [],
+      "supporting": [],
+      "conditional": []
     },
-    {
-      "axis": "wisdomKnowledge",
-      "direction": "wisdom",
-      "strength": "weak",
-      "confidence": 0.61,
-      "reason": "The text attempts synthesis and broader judgment rather than only listing facts",
-      "excerpt": "optional short excerpt"
+    "boundariesByLayer": {
+      "core": [],
+      "supporting": [],
+      "conditional": []
     },
-    {
-      "axis": "epistemicStability",
-      "direction": "positive",
-      "strength": "weak",
-      "confidence": 0.48,
-      "reason": "The text shows some truth-seeking and self-corrective language, but not enough to infer high stability",
-      "excerpt": "optional short excerpt"
-    }
-  ],
-  "notes": [
-    "optional short ambiguity note"
-  ]
+    "notes": []
+  }
 }
 
-PROFILE ENTRY RULE
-- Emit exactly one short profile line in the "profile" array.
-- Keep it to one sentence and one line.
-- Format it like:
-  +.12 stability +.05 practicality | short justification
-- Avoid long explanations.
-- Keep the wording tight enough that repeated compiles do not bloat the profile history.
-- Prefer a pipe separator over nested quotation marks inside the profile string.
-
-NOTES RULE
-- Use notes only when they add something live and non-redundant.
-- Use at most 2 short notes.
-- Skip stale wording, near-duplicates, and obvious restatements of the profile line.
-
-OPTIONAL CANON UPDATE OBJECT
-If the current layered canon clearly needs maintenance, refinement, deduping, replacement, or obsolescence handling, you may include:
-"canonUpdate": {
-  "action": "maintain | replace | update | add | obsolete | refine",
-  "principlesByLayer": {
-    "core": ["..."],
-    "supporting": ["..."],
-    "conditional": ["..."]
-  },
-  "boundariesByLayer": {
-    "core": ["..."],
-    "supporting": ["..."],
-    "conditional": ["..."]
-  },
-  "notes": ["optional short canon note"]
-}
-
-CANON UPDATE RULES
-- Only include canonUpdate when it meaningfully improves the stored canon.
-- The action tells the system what kind of maintenance you think happened.
-- If you include principlesByLayer or boundariesByLayer, output the full next canon state for that section, not partial fragments.
-- "maintain" means the current canon should stay as it is.
-- "replace" means the new canon snapshot should replace the current canon snapshot.
-- "update", "add", "obsolete", and "refine" still output the full next canon snapshot so the profiler system can store it cleanly.
-- Keep the canon lean.
-- Do not expand it just because you can.
-- Add a principle when the text states a durable positive rule, ideal, or commitment the profile appears to endorse.
-- Add a boundary when the text states a durable refusal, prohibition, or rejection the profile appears to hold.
-- Do not create canon items from one-off examples, filler, or weakly implied sentiment.
-
-INTERPRETATION RULES FOR THE LLM
-1. Assess the user's text semantically, not geometrically.
-2. Avoid false precision.
-3. Multiple evidence items for the same axis are allowed when the text contains multiple signals.
-4. Do not collapse the whole reading into one aspect when the text clearly supports more than one aspect.
-5. Before you write the final JSON, silently check each axis with a simple usable-evidence test:
-   - empathyPracticality: true or false
-   - wisdomKnowledge: true or false
-   - epistemicStability: true or false
-   If true, emit at least one evidence item for that axis.
-6. If the text contains contradiction or tension, the LLM may use:
-   - direction = "mixed"
-   - and or add a note explaining the conflict
-7. If the text is shallow, short, vague, or indirect, prefer:
-   - weaker strength
-   - lower confidence
-   - or compact profile signals without overclaiming
-8. Do not pretend that one text dump equals a final personality or philosophical profile.
-9. The LLM is extracting signals, not declaring final truth.
-10. The profile name is display-only context and should not bias interpretation.
-11. Additional info may matter if it changes semantic context.
-12. Existing principles and boundaries are editable canon, not sacred text.
-
-BAD OUTPUT EXAMPLES
-Do NOT output:
+BAD OUTPUT
+Do not output:
 - final empathyPercent
+- final practicalityPercent
 - final wisdomPercent
+- final knowledgePercent
 - final stabilityPercent
-- final x/y/z
-- surface math
-- octahedron projection math
-- profile accumulation
-- long-term memory scoring
+- final x y z
+- surface projection math
+- mandatory gate verdicts by absence
 
-FINAL INSTRUCTION TO THE LLM
-Do not output final x/y/z and do not compute scores.
-Output structured semantic signals the profiler can store and compile.
-Return valid JSON only.`;
+FINAL INSTRUCTION
+Return valid JSON only.
+Extract portable worldview structure.
+Do not compute the final plot.`;
 
 function normalizeList(items = []) {
   return items.map((item) => String(item || "").trim()).filter(Boolean);
@@ -393,12 +315,6 @@ function formatLayeredSection(title, layeredInput = {}) {
   return lines.join("\n");
 }
 
-function formatProfileLines(entries = []) {
-  const clean = normalizeList(entries);
-  if (!clean.length) return "Profile entries: none";
-  return `Profile entries:\n${clean.map((item) => `- ${item}`).join("\n")}`;
-}
-
 function formatComputedSection(computed = {}) {
   const lines = ["Computed profiler values"];
   if (computed && typeof computed === "object") {
@@ -409,6 +325,7 @@ function formatComputedSection(computed = {}) {
     lines.push(`Wisdom: ${uiLike.wisdomPercent ?? "n/a"}`);
     lines.push(`Knowledge: ${uiLike.knowledgePercent ?? "n/a"}`);
     lines.push(`Stability: ${uiLike.stabilityPercent ?? "n/a"}`);
+    lines.push(`Coverage: ${uiLike.coveragePercent ?? "n/a"}`);
     lines.push(`X: ${point.x ?? "n/a"}`);
     lines.push(`Y: ${point.y ?? "n/a"}`);
     lines.push(`Z: ${point.z ?? "n/a"}`);
@@ -435,7 +352,8 @@ export function buildLLMPacket({
   const sections = [
     "SYSTEM FRAME",
     "You are reading one contract and one schema for the Epistemic Octahedron pipeline.",
-    "Interpret the user text semantically and emit JSON only. Include canon updates when warranted.",
+    "Interpret the user text semantically and return JSON only.",
+    "You may include canonUpdate when the current canon clearly needs maintenance.",
     "",
     "PROFILE CONTEXT",
     `Name: ${String(name || "").trim() || "unspecified"}`,
@@ -470,43 +388,32 @@ export function buildProfilerAssessmentPacket({
   const sections = [
     "SYSTEM FRAME",
     "You are reading a finalized profiler snapshot from the Epistemic Octahedron pipeline.",
-    "Use this snapshot to describe the profile's philosophy, not to discuss the wider system.",
+    "Use this snapshot to describe the compiled philosophy, not the wider system.",
     "",
     "TASK",
-    "Write a concise overview of the profile's philosophy from the compiled point and the supporting profile lines.",
+    "Write a concise overview of the profile's philosophy from the compiled point and supporting profile lines.",
     "Use additional info only when it materially changes interpretation.",
     "Treat the name as display-only.",
-    "Do not invent missing biography.",
-    "Do not explain pipeline mechanics unless they are needed to interpret the point.",
+    "Do not invent biography.",
     "",
     "GEOMETRY REFERENCE",
-    "The finalized point lies on an octahedron surface where |x| + |y| + |z| = 1.",
+    "The plotted point lies on the octahedron surface where |x| + |y| + |z| = 1 whenever the worldview is active enough to project.",
     "x negative = Practicality, x positive = Empathy.",
     "z negative = Knowledge, z positive = Wisdom.",
     "y negative = Negative Epistemic Stability, y positive = Positive Epistemic Stability.",
-    "Higher |y| means stability is taking more of the total share, so the lateral axes matter less as competing tensions.",
-    "At strong positive stability, the lateral aspects are more integrated under maturity.",
+    "The origin is reserved for the pre-philosophical null state.",
     "",
     "PROFILE SNAPSHOT",
     `Name: ${String(name || "").trim() || "unspecified"}`,
     "Name handling: display-only, do not let it bias judgment.",
     `Additional info: ${String(additionalInfo || "").trim() || "none"}`,
     `Avatar: ${String(avatar || "").trim() || "auto"}`,
-    `Empathy: ${uiLike.empathyPercent ?? "n/a"}`,
-    `Practicality: ${uiLike.practicalityPercent ?? "n/a"}`,
-    `Wisdom: ${uiLike.wisdomPercent ?? "n/a"}`,
-    `Knowledge: ${uiLike.knowledgePercent ?? "n/a"}`,
-    `Stability: ${uiLike.stabilityPercent ?? "n/a"}`,
-    `X: ${point.x ?? "n/a"}`,
-    `Y: ${point.y ?? "n/a"}`,
-    `Z: ${point.z ?? "n/a"}`,
+    formatComputedSection(computed),
     cleanEntries.length
-      ? `Supporting profile entries:
-${cleanEntries.map((item) => `- ${item}`).join("\n")}`
+      ? `Supporting profile entries:\n${cleanEntries.map((item) => `- ${item}`).join("\n")}`
       : "Supporting profile entries: none",
     cleanNotes.length
-      ? `Supporting notes:
-${cleanNotes.map((item) => `- ${item}`).join("\n")}`
+      ? `Supporting notes:\n${cleanNotes.map((item) => `- ${item}`).join("\n")}`
       : "Supporting notes: none",
     "",
     "OUTPUT",
