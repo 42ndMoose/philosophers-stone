@@ -771,7 +771,12 @@ function extractCanonFromPayload(payload = {}) {
 
   if (hasAnyLayeredItems(explicitPrinciples) || hasAnyLayeredItems(explicitBoundaries)) {
     return {
-      mode: action === "maintain" ? "maintain" : "replace",
+      mode:
+        action === "replace" || action === "obsolete"
+          ? "replace"
+          : action === "maintain"
+            ? "maintain"
+            : "merge",
       canon: {
         principles: explicitPrinciples,
         boundaries: explicitBoundaries,
@@ -789,6 +794,10 @@ function extractCanonFromPayload(payload = {}) {
   }
 
   const updates = payload.canonUpdates || payload.canon_updates || payload.updates || {};
+  const localExtraction = payload.local_extraction || payload.localExtraction || {};
+  const profileUpdates =
+    payload.profile_update_signals || payload.profileUpdateSignals || {};
+
   return {
     mode: "merge",
     canon: {
@@ -798,6 +807,9 @@ function extractCanonFromPayload(payload = {}) {
           updates.principlesByLayer ||
           updates.principles_by_layer ||
           layerFromFlatList([
+            ...(localExtraction.principles || []),
+            ...(profileUpdates.new_principles || []),
+            ...(profileUpdates.refined_principles || []),
             ...(payload.principles || []),
             ...(updates.principles || []),
             ...(updates.addPrinciples || []),
@@ -810,6 +822,9 @@ function extractCanonFromPayload(payload = {}) {
           updates.boundariesByLayer ||
           updates.boundaries_by_layer ||
           layerFromFlatList([
+            ...(localExtraction.boundaries || []),
+            ...(profileUpdates.new_boundaries || []),
+            ...(profileUpdates.refined_boundaries || []),
             ...(payload.boundaries || []),
             ...(updates.boundaries || []),
             ...(updates.addBoundaries || []),

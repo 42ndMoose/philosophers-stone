@@ -173,6 +173,12 @@ function normalizeEvidenceSpan(value) {
   return cleanString(value);
 }
 
+function pickNormalizedText(item) {
+  return cleanString(
+    item?.normalized || item?.text || item?.value || item?.note || item?.reason || item,
+  );
+}
+
 export class EpistemicProfiler {
   constructor(options = {}) {
     this.config = {
@@ -1223,14 +1229,20 @@ export class EpistemicProfiler {
     };
   }
 
-  axisText(value, axisKey) {
-    const numeric = Number(value) || 0;
-    const threshold = Number(this.config.summaryAxisFloor ?? 0.04);
-    if (Math.abs(numeric) < threshold) return null;
-    const labels = AXIS_LABELS[axisKey];
-    const label = numeric >= 0 ? labels.positive : labels.negative;
+axisText(value, axisKey) {
+  const numeric = Number(value) || 0;
+  const threshold = Number(this.config.summaryAxisFloor ?? 0.04);
+  if (Math.abs(numeric) < threshold) return null;
+
+  const labels = AXIS_LABELS[axisKey];
+  const label = numeric >= 0 ? labels.positive : labels.negative;
+
+  if (axisKey === "epistemicStability") {
     return `${EpistemicProfiler.formatSigned(numeric)} ${label}`;
   }
+
+  return `+${Math.abs(numeric).toFixed(2)} ${label}`;
+}
 
   buildAggregateProfileLine(semantics = {}) {
     const parts = [];
