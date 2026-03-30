@@ -173,12 +173,6 @@ function normalizeEvidenceSpan(value) {
   return cleanString(value);
 }
 
-function pickNormalizedText(item) {
-  return cleanString(
-    item?.normalized || item?.text || item?.value || item?.note || item?.reason || item,
-  );
-}
-
 export class EpistemicProfiler {
   constructor(options = {}) {
     this.config = {
