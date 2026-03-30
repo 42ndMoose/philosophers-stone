@@ -352,8 +352,8 @@
 
         <div class="slider-row">
           <div class="slider-head pair-head">
-            <span id="wisdomSliderLabel" class="aspect-label">Wisdom</span>
-            <span id="knowledgeSliderLabel" class="aspect-label right">Knowledge</span>
+            <span id="knowledgeSliderLabel" class="aspect-label">Knowledge</span>
+            <span id="wisdomSliderLabel" class="aspect-label right">Wisdom</span>
           </div>
           <div class="range-wrap"><input id="wisdom" type="range" min="0" max="100" step="0.1" value="50" /></div>
         </div>
@@ -432,8 +432,8 @@
     const aspectTooltipDefs = [
       { node: practicalitySliderLabel, input: practicalityEl, side: 'left' },
       { node: empathySliderLabel, input: practicalityEl, side: 'right' },
-      { node: wisdomSliderLabel, input: wisdomEl, side: 'left' },
-      { node: knowledgeSliderLabel, input: wisdomEl, side: 'right' }
+      { node: knowledgeSliderLabel, input: wisdomEl, side: 'left' },
+      { node: wisdomSliderLabel, input: wisdomEl, side: 'right' }
     ];
 
     const scene = new THREE.Scene();
@@ -710,11 +710,11 @@
 
     function updateAspectLabels() {
       const x = bipolarFromPair(parseFloat(practicalityEl.value));
-      const z = bipolarFromReversedPair(parseFloat(wisdomEl.value));
+      const z = bipolarFromPair(parseFloat(wisdomEl.value));
       const stabilityValue = parseFloat(stabilityEl.value);
 
       updatePairLabels(practicalitySliderLabel, empathySliderLabel, x, 'right', stabilityValue);
-      updatePairLabels(wisdomSliderLabel, knowledgeSliderLabel, z, 'left', stabilityValue);
+      updatePairLabels(knowledgeSliderLabel, wisdomSliderLabel, z, 'right', stabilityValue);
     }
 
     function engageSurfaceLock(preferredSign = null) {
@@ -732,7 +732,7 @@
       }
 
       const xAxis = bipolarFromPair(parseFloat(practicalityEl.value));
-      const zAxis = bipolarFromReversedPair(parseFloat(wisdomEl.value));
+      const zAxis = bipolarFromPair(parseFloat(wisdomEl.value));
       const norm = Math.max(1, Math.abs(xAxis) + Math.abs(zAxis));
       const x = xAxis / norm;
       const z = zAxis / norm;
@@ -746,7 +746,7 @@
     function controlsFromPoint(point, options = {}) {
       const { preserveActiveCoordRaw = false } = options;
       const practicality = pairFromBipolar(point.x);
-      const wisdom = reversedPairFromBipolar(point.z);
+      const wisdom = pairFromBipolar(point.z);
 
       practicalityEl.value = practicality.toFixed(3);
       wisdomEl.value = wisdom.toFixed(3);
@@ -1348,13 +1348,13 @@
       near(p.y, 0, 'practicality max y');
       near(p.z, 0, 'practicality max z');
 
-      practicalityEl.value = '50'; wisdomEl.value = '0';
+      practicalityEl.value = '50'; wisdomEl.value = '100';
       p = pointFromControls();
       near(p.x, 0, 'wisdom max x');
       near(p.y, 0, 'wisdom max y');
       near(p.z, 1, 'wisdom max z');
 
-      practicalityEl.value = '50'; wisdomEl.value = '100';
+      practicalityEl.value = '50'; wisdomEl.value = '0';
       p = pointFromControls();
       near(p.x, 0, 'knowledge max x');
       near(p.y, 0, 'knowledge max y');
@@ -1366,7 +1366,7 @@
       near(p.y, 0.5, 'mid empathy y');
       near(p.z, 0, 'mid empathy z');
 
-      practicalityEl.value = '100'; wisdomEl.value = '0';
+      practicalityEl.value = '100'; wisdomEl.value = '100';
       p = pointFromControls();
       near(p.x, 0.5, 'dual max x projected');
       near(p.y, 0, 'dual max y projected');
@@ -1378,10 +1378,10 @@
       near(parseFloat(stabilityEl.value), 50, 'inverse stability from surface point');
 
       controlsFromPoint(new THREE.Vector3(0, 0, 1));
-      near(parseFloat(wisdomEl.value), 0, 'inverse wisdom slider reaches left for wisdom');
+      near(parseFloat(wisdomEl.value), 100, 'inverse wisdom slider reaches right for wisdom');
 
       controlsFromPoint(new THREE.Vector3(0, 0, -1));
-      near(parseFloat(wisdomEl.value), 100, 'inverse wisdom slider reaches right for knowledge');
+      near(parseFloat(wisdomEl.value), 0, 'inverse wisdom slider reaches left for knowledge');
 
       const projected = projectPointToOctaSurface(new THREE.Vector3(0.2, 0.2, 0));
       near(projected.x, 0.5, 'projected drag point x');
