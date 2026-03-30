@@ -191,6 +191,10 @@ profile_update_signals may include:
 - retractions
 - restatements
 
+PROFILE SUMMARY LINE
+The profile array is a short human-readable summary line.
+When structured fields are present, the profiler treats the profile line as display-oriented backup text and does not score it again.
+
 OPTIONAL CANON UPDATE
 If the current canon clearly needs maintenance, refinement, replacement, or dedupe, you may include canonUpdate.
 If you include principlesByLayer or boundariesByLayer, output the full next state for that section.

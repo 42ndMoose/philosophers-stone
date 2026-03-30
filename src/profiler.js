@@ -44,6 +44,31 @@ const DEFAULT_SIGNAL_TYPES = {
   ]),
 };
 
+
+const DEFAULT_LOCAL_Y_SIGNAL_WEIGHTS = {
+  positive: {
+    counter_consideration: 1.15,
+    self_correction: 1.25,
+    reality_contact: 1.25,
+    coherence: 1.1,
+    error_awareness: 1.15,
+    revision_openness: 1.2,
+    non_strawman_fairness: 1.05,
+    legacy_positive: 1.0,
+  },
+  negative: {
+    false_certainty: 0.6,
+    self_sealing: 1.35,
+    contradiction_evasion: 1.2,
+    reality_detachment: 1.25,
+    dogmatic_closure: 1.05,
+    collapse_marker: 1.4,
+    strawman_dependence: 0.55,
+    broad_motive_attribution: 0.45,
+    legacy_negative: 1.0,
+  },
+};
+
 const DEFAULT_EMPTY_PROFILE_STATE = () => ({
   core_principles: [],
   core_boundaries: [],
@@ -122,6 +147,7 @@ export class EpistemicProfiler {
       strengthWeights: { ...DEFAULT_STRENGTH_WEIGHTS },
       scopeWeights: { ...DEFAULT_SCOPE_WEIGHTS },
       gateWeights: { ...DEFAULT_GATE_WEIGHTS },
+      localYSignalWeights: cloneJSON(DEFAULT_LOCAL_Y_SIGNAL_WEIGHTS),
       axisSaturation: {
         empathyPracticality: 2.5,
         wisdomKnowledge: 2.5,
@@ -236,15 +262,15 @@ export class EpistemicProfiler {
 
       const regex = /([+-](?:\d+(?:\.\d+)?|\.\d+))\s+(stability|instability|empathy|practicality|wisdom|knowledge)\b/gi;
       for (const match of line.matchAll(regex)) {
-        const magnitude = Math.abs(Number(match[1]));
+        const signedNumber = Number(match[1]);
         const labelInfo = EpistemicProfiler.axisDirectionFromProfileLabel(match[2]);
-        if (!labelInfo || !Number.isFinite(magnitude)) continue;
+        if (!labelInfo || !Number.isFinite(signedNumber)) continue;
 
         signals.push({
           axis: labelInfo.axis,
           direction: labelInfo.direction,
           label: String(match[2]).toLowerCase(),
-          value: EpistemicProfiler.clamp(magnitude * labelInfo.sign, -1, 1),
+          value: EpistemicProfiler.clamp(signedNumber * labelInfo.sign, -1, 1),
           source: line,
         });
       }
@@ -323,7 +349,9 @@ export class EpistemicProfiler {
         return {
           ...item,
           polarity: cleanString(item.polarity).toLowerCase() || fallbackPolarity,
-          signal_type: cleanString(item.signal_type).toLowerCase() || `legacy_${fallbackPolarity}`,
+          signal_type:
+            cleanString(item.signal_type || item.type || item.signal).toLowerCase() ||
+            `legacy_${fallbackPolarity}`,
           strength,
           confidence,
           evidence_span: normalizeEvidenceSpan(item.evidence_span || item.excerpt || item.reason),
@@ -505,37 +533,76 @@ export class EpistemicProfiler {
     };
   }
 
-  gateEventsFromProfileUpdates(profile_update_signals = {}) {
+  gateEventsFromProfileUpdates(profile_update_signals = {}, explicitGateEvents = []) {
     const out = [];
+    const explicitKeys = new Set(
+      (Array.isArray(explicitGateEvents) ? explicitGateEvents : [])
+        .map((item) => {
+          const gate = cleanString(item?.gate);
+          const direction = cleanString(item?.direction).toLowerCase();
+          return gate && direction ? `${gate}::${direction}` : "";
+        })
+        .filter(Boolean),
+    );
+
+    const buildFallbackEvent = (item, direction) => {
+      const gate = cleanString(item?.gate || item?.name || item);
+      if (!(gate in this.state.gateStates)) return null;
+      if (explicitKeys.has(`${gate}::${direction}`)) return null;
+      return {
+        gate,
+        direction,
+        strength: cleanString(item?.strength).toLowerCase() || "weak",
+        confidence: EpistemicProfiler.clamp(Number(item?.confidence ?? 0.65), 0.5, 1),
+        novelty: EpistemicProfiler.clamp(Number(item?.novelty ?? 0.5), 0, 1),
+        evidence_span: normalizeEvidenceSpan(item?.evidence_span || item?.reason),
+      };
+    };
+
     for (const item of Array.isArray(profile_update_signals.cleared_gates)
       ? profile_update_signals.cleared_gates
       : []) {
-      const gate = cleanString(item?.gate || item?.name || item);
-      if (!(gate in this.state.gateStates)) continue;
-      out.push({
-        gate,
-        direction: "positive",
-        strength: cleanString(item?.strength).toLowerCase() || "moderate",
-        confidence: EpistemicProfiler.clamp(Number(item?.confidence ?? 0.8), 0.5, 1),
-        novelty: EpistemicProfiler.clamp(Number(item?.novelty ?? 1), 0, 1),
-        evidence_span: normalizeEvidenceSpan(item?.evidence_span || item?.reason),
-      });
+      const event = buildFallbackEvent(item, "positive");
+      if (event) out.push(event);
     }
     for (const item of Array.isArray(profile_update_signals.failed_gates)
       ? profile_update_signals.failed_gates
       : []) {
-      const gate = cleanString(item?.gate || item?.name || item);
-      if (!(gate in this.state.gateStates)) continue;
-      out.push({
-        gate,
-        direction: "negative",
-        strength: cleanString(item?.strength).toLowerCase() || "moderate",
-        confidence: EpistemicProfiler.clamp(Number(item?.confidence ?? 0.8), 0.5, 1),
-        novelty: EpistemicProfiler.clamp(Number(item?.novelty ?? 1), 0, 1),
-        evidence_span: normalizeEvidenceSpan(item?.evidence_span || item?.reason),
-      });
+      const event = buildFallbackEvent(item, "negative");
+      if (event) out.push(event);
     }
     return out;
+  }
+
+  payloadHasStructuredScorableSignals(payload = {}) {
+    const axisEvents = payload.axis_events || {};
+    const localExtraction = payload.local_extraction || {};
+    const extractionKeys = [
+      "principles",
+      "boundaries",
+      "claimed_values",
+      "tradeoffs",
+      "contradictions",
+    ];
+
+    return Boolean(
+      (Array.isArray(payload.evidence) && payload.evidence.length) ||
+        (Array.isArray(payload.triggered_gate_events) && payload.triggered_gate_events.length) ||
+        (Array.isArray(payload.local_y_positive_signals) && payload.local_y_positive_signals.length) ||
+        (Array.isArray(payload.local_y_negative_signals) && payload.local_y_negative_signals.length) ||
+        (Array.isArray(axisEvents.x_pole_evidence) && axisEvents.x_pole_evidence.length) ||
+        (Array.isArray(axisEvents.x_integration_events) && axisEvents.x_integration_events.length) ||
+        (Array.isArray(axisEvents.z_pole_evidence) && axisEvents.z_pole_evidence.length) ||
+        (Array.isArray(axisEvents.z_integration_events) && axisEvents.z_integration_events.length) ||
+        extractionKeys.some((key) => Array.isArray(localExtraction[key]) && localExtraction[key].length),
+    );
+  }
+
+  localYSignalWeight(signal) {
+    const polarity = cleanString(signal?.polarity).toLowerCase();
+    const signalType = cleanString(signal?.signal_type).toLowerCase();
+    const bucket = this.config.localYSignalWeights?.[polarity] || {};
+    return Number(bucket?.[signalType]) || 1;
   }
 
   buildFallbackProfileLine(entry) {
@@ -599,7 +666,20 @@ export class EpistemicProfiler {
     const scope_strength = this.inferScopeStrength(analysis_scope, payload);
 
     const legacy = this.normalizeLegacyEvidence(payload.evidence || [], analysis_scope);
-    const compact = this.normalizeCompactSignals(profile);
+    const structuredScorableSignalsPresent = this.payloadHasStructuredScorableSignals(payload);
+    const compact = structuredScorableSignalsPresent
+      ? {
+          compactSignals: [],
+          axis_events: {
+            x_pole_evidence: [],
+            x_integration_events: [],
+            z_pole_evidence: [],
+            z_integration_events: [],
+          },
+          local_y_positive_signals: [],
+          local_y_negative_signals: [],
+        }
+      : this.normalizeCompactSignals(profile);
 
     const axis_events = {
       x_pole_evidence: [
@@ -639,9 +719,10 @@ export class EpistemicProfiler {
       payload.profile_update_signals || {},
     );
 
+    const explicitGateEvents = this.normalizeGateEvents(payload.triggered_gate_events || []);
     const triggered_gate_events = [
-      ...this.normalizeGateEvents(payload.triggered_gate_events || []),
-      ...this.gateEventsFromProfileUpdates(profile_update_signals),
+      ...explicitGateEvents,
+      ...this.gateEventsFromProfileUpdates(profile_update_signals, explicitGateEvents),
     ];
 
     return {
@@ -903,11 +984,11 @@ export class EpistemicProfiler {
       contradictionPenalty += this.contradictionPenaltyForEntry(entry);
 
       for (const signal of entry.local_y_positive_signals || []) {
-        positiveSum += this.axisContributionValue(signal, scopeWeight);
+        positiveSum += this.axisContributionValue(signal, scopeWeight) * this.localYSignalWeight(signal);
         positiveSignalCount += 1;
       }
       for (const signal of entry.local_y_negative_signals || []) {
-        negativeSum += this.axisContributionValue(signal, scopeWeight);
+        negativeSum += this.axisContributionValue(signal, scopeWeight) * this.localYSignalWeight(signal);
         negativeSignalCount += 1;
       }
     }
