@@ -9,7 +9,7 @@ import {
 import { AVATARS, getAvatarById, pickAvatarFromPoint } from "./avatars.js";
 import { EpistemicProfiler } from "./profiler.js";
 
-const STORAGE_KEY = "philosophers-stone-workspace-v4";
+const STORAGE_KEY = "philosophers-stone-workspace-v5";
 const BUTTON_RESET_MS = 1500;
 const DIAMOND_RANGE_PERCENT = 34;
 
@@ -326,14 +326,16 @@ function renderCanonLists() {
   }
 }
 
+function getLatestProfilerMemory() {
+  return state.latestCompile?.result?.finalized?.data?.diagnostics?.profileState || {};
+}
+
 function buildPacket() {
   return buildLLMPacket({
     profileText: state.profileText,
-    name: state.name,
-    additionalInfo: state.additionalInfo,
-    avatar: getAvatarTitle(state.selectedAvatarId),
     principlesByLayer: state.canon.principles,
     boundariesByLayer: state.canon.boundaries,
+    profilerMemory: getLatestProfilerMemory(),
   });
 }
 
@@ -910,7 +912,7 @@ function renderProfileEntries(profileLines = [], notes = []) {
 
   if (!cleanProfile.length) {
     const li = document.createElement("li");
-    li.textContent = "No profile entry yet.";
+    li.textContent = "No compiled profile line yet.";
     els.profileEntriesList.appendChild(li);
   } else {
     for (const line of cleanProfile) {
@@ -1124,7 +1126,7 @@ function compilePayload() {
     };
   } else if (!hadCanonSignals) {
     throw new Error(
-      'LLM payload must contain usable evidence, structured signals, compact profile signals, or a canon update.',
+      "LLM payload must contain usable evidence, structured signals, compact profile signals, or a canon update.",
     );
   }
 
@@ -1215,7 +1217,6 @@ function bind() {
 
   const syncProfileName = () => {
     state.name = els.profileName.textContent.trim();
-    renderPacketPreview();
     saveState();
   };
 
@@ -1227,7 +1228,6 @@ function bind() {
 
   els.profileAdditionalInfo.addEventListener("input", () => {
     state.additionalInfo = els.profileAdditionalInfo.value;
-    renderPacketPreview();
     saveState();
   });
 
@@ -1270,9 +1270,9 @@ function bind() {
     try {
       const outcome = compilePayload();
       if (outcome.didCompile && outcome.didCanonUpdate) {
-        setCompileStatus("Compiled and updated canon.", "is-success");
+        setCompileStatus("Compiled aggregate and updated canon.", "is-success");
       } else if (outcome.didCompile) {
-        setCompileStatus("Compiled and merged into profile.", "is-success");
+        setCompileStatus("Compiled aggregate and merged into profile.", "is-success");
       } else {
         setCompileStatus("Canon updated.", "is-success");
       }

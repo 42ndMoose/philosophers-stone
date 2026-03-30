@@ -1,34 +1,15 @@
 const CANON_LAYER_KEYS = ["core", "supporting", "conditional"];
 
 const CORE_CONTRACT = `EPISTEMIC OCTAHEDRON INTERPRETER CONTRACT
-version: 4.0
+version: 4.1
 
 PURPOSE
-This contract tells the LLM what the Epistemic Octahedron models and what kind of extraction the profiler can use.
+The Epistemic Octahedron models active worldview structure on an octahedral surface.
 The LLM is an extractor only.
-It does not compute final scores, final maturity percentages, or final x y z coordinates.
+It does not compute final scores, maturity percentages, or final x y z coordinates.
 
 PIPELINE
 System -> LLM -> Profiler -> Visualizer
-
-1. System
-Provides:
-- the user's current text
-- this interpreter contract
-- the current layered canon
-- the JSON output shape
-
-2. LLM
-Reads the text semantically.
-It extracts portable structure.
-It does not do final scoring.
-
-3. Profiler
-Receives structured extraction.
-The profiler stores, weighs, merges, filters, and computes semantic params and the final projected point.
-
-4. Visualizer
-Receives only finalized profiler data.
 
 GEOMETRIC REFERENCE
 Active worldview positions are projected onto the octahedron surface:
@@ -45,15 +26,8 @@ Axis signs are fixed:
 
 NULL STATE AND COLLAPSE
 The coordinate origin (0, 0, 0) is the pre-philosophical null state.
-It represents no active worldview strong enough to plot on the surface.
-One example is infancy, but the idea is broader than age.
-
 The lower vertex (0, -1, 0) is epistemic collapse.
-It is not the same thing as the null state.
-It is an active negative condition.
-
 The upper vertex (0, 1, 0) is objective peak philosophical maturity.
-That means the four lateral tensions have been considered and integrated under positive epistemic stability.
 
 CORE SEMANTIC DIMENSIONS
 Empathy:
@@ -86,15 +60,15 @@ Epistemic stability:
 - self-correction
 - resistance to self-sealing distortion
 
-LLM EXTRACTION RULES
-1. Extract structure, not final verdicts.
+EXTRACTION RULES
+1. Extract portable structure, not final verdicts.
 2. Prefer under-calling over over-calling.
-3. Every meaningful extraction should carry evidence_span when possible.
+3. Use evidence_span whenever possible.
 4. Only emit triggered gate events when the text gives actual evidence for or against a gate.
-5. Silence is neutral. Do not output gate statuses for absence.
-6. Do not emit final percentages, maturity scores, or coordinates.
-7. The current profile name is display-only context and should not bias interpretation.
-8. The canon is editable memory, not sacred text.
+5. Silence is neutral. Do not emit gate failures by absence.
+6. Do not compute the final plot.
+7. Do not let display labels or prior canon wording bias extraction.
+8. Use canon memory as context, not as something to parrot back.
 
 SCOPE CLASSIFICATION
 Always classify the input as one of:
@@ -123,8 +97,6 @@ local_extraction may include:
 - claimed_values
 - tradeoffs
 - contradictions
-
-Each extracted item should be normalized and supported by an evidence span when possible.
 
 AXIS EVENTS
 Do not emit final x or z scores.
@@ -169,8 +141,7 @@ Use only these six gates:
 - G5_reality_contact
 - G6_non_self_sealing
 
-Only emit triggered_gate_events when the text gives real evidence.
-Each event must include:
+Each triggered_gate_event should include:
 - gate
 - direction = positive or negative
 - strength = weak moderate or strong
@@ -192,13 +163,14 @@ profile_update_signals may include:
 - restatements
 
 PROFILE SUMMARY LINE
-The profile array is a short human-readable summary line.
-When structured fields are present, the profiler treats the profile line as display-oriented backup text and does not score it again.
+The profile array is display text only.
+Keep it plain-language.
+Do not put numeric axis values, percentages, coordinates, or projection math in it.
 
 OPTIONAL CANON UPDATE
-If the current canon clearly needs maintenance, refinement, replacement, or dedupe, you may include canonUpdate.
+If canon memory clearly needs maintenance, you may include canonUpdate.
 If you include principlesByLayer or boundariesByLayer, output the full next state for that section.
-Keep the canon lean.
+Keep canon lean.
 
 REQUIRED JSON SHAPE
 {
@@ -207,7 +179,7 @@ REQUIRED JSON SHAPE
   "scope_strength": "low | medium | high",
   "statement_modes": [],
   "profile": [
-    "+.18 stability -.08 practicality | short justification"
+    "short display summary only"
   ],
   "local_extraction": {
     "principles": [],
@@ -254,21 +226,8 @@ REQUIRED JSON SHAPE
   }
 }
 
-BAD OUTPUT
-Do not output:
-- final empathyPercent
-- final practicalityPercent
-- final wisdomPercent
-- final knowledgePercent
-- final stabilityPercent
-- final x y z
-- surface projection math
-- mandatory gate verdicts by absence
-
 FINAL INSTRUCTION
-Return valid JSON only.
-Extract portable worldview structure.
-Do not compute the final plot.`;
+Return valid JSON only.`;
 
 function normalizeList(items = []) {
   return items.map((item) => String(item || "").trim()).filter(Boolean);
@@ -319,6 +278,30 @@ function formatLayeredSection(title, layeredInput = {}) {
   return lines.join("\n");
 }
 
+function formatSimpleListSection(title, items = []) {
+  const clean = normalizeList(items);
+  if (!clean.length) {
+    return `${title}: none`;
+  }
+  return [title, ...clean.map((item) => `- ${item}`)].join("\n");
+}
+
+function formatProfilerMemorySection(memory = {}) {
+  const corePrinciples = normalizeList(memory.core_principles || memory.corePrinciples || []);
+  const coreBoundaries = normalizeList(memory.core_boundaries || memory.coreBoundaries || []);
+  const metaMarkers = normalizeList(
+    memory.meta_epistemic_markers || memory.metaEpistemicMarkers || [],
+  );
+  const riskNotes = normalizeList(memory.risk_notes || memory.riskNotes || []);
+
+  return [
+    formatSimpleListSection("Profiler memory: core principles", corePrinciples),
+    formatSimpleListSection("Profiler memory: core boundaries", coreBoundaries),
+    formatSimpleListSection("Profiler memory: meta-epistemic markers", metaMarkers),
+    formatSimpleListSection("Profiler memory: risk notes", riskNotes),
+  ].join("\n\n");
+}
+
 function formatComputedSection(computed = {}) {
   const lines = ["Computed profiler values"];
   if (computed && typeof computed === "object") {
@@ -346,26 +329,23 @@ export {
 
 export function buildLLMPacket({
   profileText = "",
-  name = "",
-  additionalInfo = "",
-  avatar = "",
   principlesByLayer = {},
   boundariesByLayer = {},
+  profilerMemory = {},
 } = {}) {
   const cleanProfileText = String(profileText || "").trim();
   const sections = [
     "SYSTEM FRAME",
     "You are reading one contract and one schema for the Epistemic Octahedron pipeline.",
     "Interpret the user text semantically and return JSON only.",
-    "You may include canonUpdate when the current canon clearly needs maintenance.",
+    "You may include canonUpdate when canon memory clearly needs maintenance.",
     "",
-    "PROFILE CONTEXT",
-    `Name: ${String(name || "").trim() || "unspecified"}`,
-    "Name handling: display-only, do not let it bias judgment.",
-    `Additional info: ${String(additionalInfo || "").trim() || "none"}`,
-    `Avatar preference: ${String(avatar || "").trim() || "auto"}`,
+    "CANON MEMORY",
     formatLayeredSection("Principles by layer", principlesByLayer),
     formatLayeredSection("Boundaries by layer", boundariesByLayer),
+    "",
+    "PROFILER MEMORY",
+    formatProfilerMemorySection(profilerMemory),
     "",
     "USER PROFILE INPUT",
     cleanProfileText || "[no profile text provided]",
@@ -386,8 +366,6 @@ export function buildProfilerAssessmentPacket({
 } = {}) {
   const cleanEntries = normalizeList(profileEntries).slice(0, 6);
   const cleanNotes = normalizeList(notes).slice(0, 6);
-  const point = computed.point || {};
-  const uiLike = computed.uiLike || {};
 
   const sections = [
     "SYSTEM FRAME",
@@ -395,7 +373,7 @@ export function buildProfilerAssessmentPacket({
     "Use this snapshot to describe the compiled philosophy, not the wider system.",
     "",
     "TASK",
-    "Write a concise overview of the profile's philosophy from the compiled point and supporting profile lines.",
+    "Write a concise overview of the profile's philosophy from the compiled point and supporting lines.",
     "Use additional info only when it materially changes interpretation.",
     "Treat the name as display-only.",
     "Do not invent biography.",
@@ -414,8 +392,8 @@ export function buildProfilerAssessmentPacket({
     `Avatar: ${String(avatar || "").trim() || "auto"}`,
     formatComputedSection(computed),
     cleanEntries.length
-      ? `Supporting profile entries:\n${cleanEntries.map((item) => `- ${item}`).join("\n")}`
-      : "Supporting profile entries: none",
+      ? `Supporting profile lines:\n${cleanEntries.map((item) => `- ${item}`).join("\n")}`
+      : "Supporting profile lines: none",
     cleanNotes.length
       ? `Supporting notes:\n${cleanNotes.map((item) => `- ${item}`).join("\n")}`
       : "Supporting notes: none",
