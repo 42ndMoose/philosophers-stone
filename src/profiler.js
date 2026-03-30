@@ -128,7 +128,8 @@ function cleanStringList(items = []) {
             item.note ||
             item.reason ||
             item.principle ||
-            item.boundary,
+            item.boundary ||
+            item.target,
         );
       }
       return "";
@@ -171,12 +172,6 @@ function normalizeEvidenceSpan(value) {
     return value.map((item) => cleanString(item)).filter(Boolean).join(" | ");
   }
   return cleanString(value);
-}
-
-function pickNormalizedText(item) {
-  return cleanString(
-    item?.normalized || item?.text || item?.value || item?.note || item?.reason || item,
-  );
 }
 
 export class EpistemicProfiler {
@@ -291,6 +286,18 @@ export class EpistemicProfiler {
     return signals;
   }
 
+  static projectionActivityFromAxisSummary(summary = {}, epsilon = 1e-9) {
+    const saturation = Math.max(Number(summary?.saturation) || 0, epsilon);
+    const poleMagnitude = Number(summary?.poleMagnitude) || 0;
+    const integrationTotal = Number(summary?.integrationTotal) || 0;
+
+    return EpistemicProfiler.clamp(
+      (poleMagnitude + integrationTotal) / saturation,
+      0,
+      1,
+    );
+  }
+
   strengthWeight(strength) {
     const normalized = cleanString(strength).toLowerCase();
     return this.config.strengthWeights[normalized] ?? this.config.strengthWeights.moderate;
@@ -309,16 +316,19 @@ export class EpistemicProfiler {
     const explicit = cleanString(payload.analysis_scope).toLowerCase();
     if (this.config.scopeWeights[explicit]) return explicit;
 
-    const evidenceCount = Array.isArray(payload.evidence) ? payload.evidence.length : 0;
     const gateCount = Array.isArray(payload.triggered_gate_events)
       ? payload.triggered_gate_events.length
       : 0;
     const principleCount = Array.isArray(payload?.local_extraction?.principles)
       ? payload.local_extraction.principles.length
       : 0;
-    if (evidenceCount + gateCount + principleCount >= 6) return "full_profile_import";
-    if (evidenceCount + gateCount + principleCount >= 3) return "worldview_fragment";
-    if (evidenceCount + gateCount + principleCount >= 1) return "stance";
+    const boundaryCount = Array.isArray(payload?.local_extraction?.boundaries)
+      ? payload.local_extraction.boundaries.length
+      : 0;
+
+    if (gateCount + principleCount + boundaryCount >= 6) return "full_profile_import";
+    if (gateCount + principleCount + boundaryCount >= 3) return "worldview_fragment";
+    if (gateCount + principleCount + boundaryCount >= 1) return "stance";
     return "thought";
   }
 
@@ -326,9 +336,14 @@ export class EpistemicProfiler {
     const explicit = cleanString(payload.scope_strength).toLowerCase();
     if (["low", "medium", "high"].includes(explicit)) return explicit;
     const score =
-      (Array.isArray(payload.evidence) ? payload.evidence.length : 0) +
       (Array.isArray(payload.triggered_gate_events) ? payload.triggered_gate_events.length : 0) +
-      cleanStringList(payload?.profile || []).length;
+      cleanStringList(payload?.profile || []).length +
+      (Array.isArray(payload?.local_extraction?.principles)
+        ? payload.local_extraction.principles.length
+        : 0) +
+      (Array.isArray(payload?.local_extraction?.boundaries)
+        ? payload.local_extraction.boundaries.length
+        : 0);
     if (score >= 6) return "high";
     if (score >= 3) return "medium";
     return "low";
@@ -384,7 +399,6 @@ export class EpistemicProfiler {
           confidence: EpistemicProfiler.clamp(Number(item.confidence ?? 1), 0.5, 1),
           novelty: EpistemicProfiler.clamp(Number(item.novelty ?? 1), 0, 1),
           evidence_span: normalizeEvidenceSpan(item.evidence_span || item.reason),
-          scope: cleanString(item.scope),
         };
       })
       .filter(Boolean);
@@ -421,74 +435,6 @@ export class EpistemicProfiler {
       out[key] = Array.isArray(input?.[key]) ? input[key] : [];
     }
     return out;
-  }
-
-  normalizeLegacyEvidence(evidence = []) {
-    const xPole = [];
-    const zPole = [];
-    const xIntegration = [];
-    const zIntegration = [];
-    const localYPositiveSignals = [];
-    const localYNegativeSignals = [];
-
-    for (const item of Array.isArray(evidence) ? evidence : []) {
-      if (!item || typeof item !== "object") continue;
-      const axis = cleanString(item.axis);
-      const direction = cleanString(item.direction).toLowerCase();
-      const strength = cleanString(item.strength).toLowerCase() || "moderate";
-      const confidence = EpistemicProfiler.clamp(Number(item.confidence ?? 1), 0, 1);
-      const evidenceSpan = normalizeEvidenceSpan(item.excerpt || item.reason);
-
-      if (axis === "empathyPracticality") {
-        if (direction === "empathy" || direction === "practicality") {
-          xPole.push({ pole: direction, strength, confidence, evidence_span: evidenceSpan });
-        } else if (direction === "mixed") {
-          xIntegration.push({
-            type: "integrated_tension",
-            strength,
-            confidence,
-            evidence_span: evidenceSpan,
-          });
-        }
-      }
-
-      if (axis === "wisdomKnowledge") {
-        if (direction === "wisdom" || direction === "knowledge") {
-          zPole.push({ pole: direction, strength, confidence, evidence_span: evidenceSpan });
-        } else if (direction === "mixed") {
-          zIntegration.push({
-            type: "integrated_tension",
-            strength,
-            confidence,
-            evidence_span: evidenceSpan,
-          });
-        }
-      }
-
-      if (axis === "epistemicStability") {
-        const target = direction === "negative" ? localYNegativeSignals : localYPositiveSignals;
-        if (direction === "positive" || direction === "negative") {
-          target.push({
-            signal_type: direction === "positive" ? "legacy_positive" : "legacy_negative",
-            polarity: direction,
-            strength,
-            confidence,
-            evidence_span: evidenceSpan,
-          });
-        }
-      }
-    }
-
-    return {
-      axis_events: {
-        x_pole_evidence: xPole,
-        x_integration_events: xIntegration,
-        z_pole_evidence: zPole,
-        z_integration_events: zIntegration,
-      },
-      local_y_positive_signals: localYPositiveSignals,
-      local_y_negative_signals: localYNegativeSignals,
-    };
   }
 
   normalizeCompactSignals(profile = []) {
@@ -593,8 +539,7 @@ export class EpistemicProfiler {
     ];
 
     return Boolean(
-      (Array.isArray(payload.evidence) && payload.evidence.length) ||
-        (Array.isArray(payload.triggered_gate_events) && payload.triggered_gate_events.length) ||
+      (Array.isArray(payload.triggered_gate_events) && payload.triggered_gate_events.length) ||
         (Array.isArray(payload.local_y_positive_signals) && payload.local_y_positive_signals.length) ||
         (Array.isArray(payload.local_y_negative_signals) && payload.local_y_negative_signals.length) ||
         (Array.isArray(axisEvents.x_pole_evidence) && axisEvents.x_pole_evidence.length) ||
@@ -730,7 +675,6 @@ export class EpistemicProfiler {
     const analysis_scope = this.inferScope(payload);
     const scope_strength = this.inferScopeStrength(analysis_scope, payload);
 
-    const legacy = this.normalizeLegacyEvidence(payload.evidence || []);
     const structuredScorableSignalsPresent = this.payloadHasStructuredScorableSignals(payload);
     const compact = structuredScorableSignalsPresent
       ? {
@@ -748,33 +692,27 @@ export class EpistemicProfiler {
 
     const axis_events = {
       x_pole_evidence: [
-        ...legacy.axis_events.x_pole_evidence,
         ...this.normalizeAxisEventList(payload?.axis_events?.x_pole_evidence || []),
         ...compact.axis_events.x_pole_evidence,
       ],
       x_integration_events: [
-        ...legacy.axis_events.x_integration_events,
         ...this.normalizeAxisEventList(payload?.axis_events?.x_integration_events || []),
       ],
       z_pole_evidence: [
-        ...legacy.axis_events.z_pole_evidence,
         ...this.normalizeAxisEventList(payload?.axis_events?.z_pole_evidence || []),
         ...compact.axis_events.z_pole_evidence,
       ],
       z_integration_events: [
-        ...legacy.axis_events.z_integration_events,
         ...this.normalizeAxisEventList(payload?.axis_events?.z_integration_events || []),
       ],
     };
 
     const local_y_positive_signals = [
-      ...legacy.local_y_positive_signals,
       ...this.normalizeSignalList(payload.local_y_positive_signals || [], "positive"),
       ...compact.local_y_positive_signals,
     ];
 
     const local_y_negative_signals = [
-      ...legacy.local_y_negative_signals,
       ...this.normalizeSignalList(payload.local_y_negative_signals || [], "negative"),
       ...compact.local_y_negative_signals,
     ];
@@ -804,7 +742,6 @@ export class EpistemicProfiler {
       local_extraction,
       profile_update_signals,
       compactSignals: compact.compactSignals,
-      legacyEvidence: Array.isArray(payload.evidence) ? cloneJSON(payload.evidence) : [],
     };
   }
 
@@ -812,7 +749,6 @@ export class EpistemicProfiler {
     const entry = this.normalizePayload(payload);
 
     const hasSignals =
-      entry.legacyEvidence.length ||
       entry.compactSignals.length ||
       entry.axis_events.x_pole_evidence.length ||
       entry.axis_events.x_integration_events.length ||
@@ -931,10 +867,6 @@ export class EpistemicProfiler {
     this.state.profileState.meta_epistemic_markers = dedupeLatestFirst(markers).slice(0, 18);
   }
 
-  getAllEvidence() {
-    return this.state.entries.flatMap((entry) => entry.legacyEvidence || []);
-  }
-
   getAllCompactSignals() {
     return this.state.entries.flatMap((entry) => entry.compactSignals || []);
   }
@@ -992,10 +924,16 @@ export class EpistemicProfiler {
     const raw = poleMagnitude <= this.config.epsilon
       ? 0
       : EpistemicProfiler.clamp(moderatedDelta / saturation, -1, 1);
+    const activityRaw = EpistemicProfiler.clamp(
+      (poleMagnitude + integrationTotal) / saturation,
+      0,
+      1,
+    );
 
     return {
       axis: axisKey,
       raw,
+      activityRaw,
       positiveTotal,
       negativeTotal,
       integrationTotal,
@@ -1161,7 +1099,7 @@ export class EpistemicProfiler {
     const yCoverage = epistemicStability.y_coverage;
 
     return {
-      model: "epistemic_octahedron_profiler_v6",
+      model: "epistemic_octahedron_profiler_v7",
       semantics: {
         a,
         b,
@@ -1189,42 +1127,81 @@ export class EpistemicProfiler {
 
   static projectSemanticTriple(a, s, b, options = {}) {
     const epsilon = options.epsilon ?? 1e-9;
+
     const xSemantic = EpistemicProfiler.clamp(Number(a) || 0, -1, 1);
     const ySemantic = EpistemicProfiler.clamp(Number(s) || 0, -1, 1);
     const zSemantic = EpistemicProfiler.clamp(Number(b) || 0, -1, 1);
-    const magnitude = Math.abs(xSemantic) + Math.abs(ySemantic) + Math.abs(zSemantic);
 
-    if (magnitude <= epsilon) {
-      return {
-        point: { x: 0, y: 0, z: 0 },
-        debug: {
-          xSemantic,
-          ySemantic,
-          zSemantic,
-          magnitude,
-          activeWorldviewThresholdMet: false,
-          surfaceEquationSatisfied: true,
-        },
+    const xActivity = EpistemicProfiler.clamp(
+      Number(options.xActivity ?? Math.abs(xSemantic)) || 0,
+      0,
+      1,
+    );
+    const zActivity = EpistemicProfiler.clamp(
+      Number(options.zActivity ?? Math.abs(zSemantic)) || 0,
+      0,
+      1,
+    );
+
+    const lateralBudget = Math.max(0, 1 - Math.abs(ySemantic));
+    const sumAB = Math.abs(xSemantic) + Math.abs(zSemantic);
+
+    let point = { x: 0, y: 0, z: 0 };
+    let projectionMode = "origin";
+    let unresolvedLateralBudget = 0;
+
+    if (Math.abs(ySemantic) >= 1 - epsilon) {
+      point = {
+        x: 0,
+        y: Math.sign(ySemantic) || 0,
+        z: 0,
       };
+      projectionMode = "pole";
+    } else if (sumAB > epsilon) {
+      point = {
+        x: (xSemantic / sumAB) * lateralBudget,
+        y: ySemantic,
+        z: (zSemantic / sumAB) * lateralBudget,
+      };
+      projectionMode = "surface_budget_from_direction";
+    } else if (xActivity + zActivity > epsilon) {
+      point = {
+        x: 0,
+        y: ySemantic,
+        z: 0,
+      };
+      projectionMode = "ambiguous_balanced_lateral_activity";
+      unresolvedLateralBudget = lateralBudget;
+    } else if (Math.abs(ySemantic) > epsilon) {
+      point = {
+        x: 0,
+        y: ySemantic,
+        z: 0,
+      };
+      projectionMode = "interior_vertical_only";
+      unresolvedLateralBudget = lateralBudget;
     }
 
-    const point = {
-      x: xSemantic / magnitude,
-      y: ySemantic / magnitude,
-      z: zSemantic / magnitude,
-    };
-
     const manhattan = Math.abs(point.x) + Math.abs(point.y) + Math.abs(point.z);
+    const activeWorldviewThresholdMet =
+      Math.abs(xSemantic) + Math.abs(ySemantic) + Math.abs(zSemantic) > epsilon ||
+      xActivity + zActivity > epsilon;
+
     return {
       point,
       debug: {
         xSemantic,
         ySemantic,
         zSemantic,
-        magnitude,
+        xActivity,
+        zActivity,
+        lateralBudget,
+        unresolvedLateralBudget,
         manhattan,
-        activeWorldviewThresholdMet: true,
-        surfaceEquationSatisfied: Math.abs(manhattan - 1) <= 1e-6,
+        projectionMode,
+        activeWorldviewThresholdMet,
+        surfaceEquationSatisfied:
+          projectionMode === "origin" || Math.abs(manhattan - 1) <= 1e-6,
       },
     };
   }
@@ -1313,8 +1290,20 @@ export class EpistemicProfiler {
   computePoint() {
     const semanticProfile = this.getSemanticProfile();
     const { a, b, s, yCoverage } = semanticProfile.semantics;
+
+    const xActivity = EpistemicProfiler.projectionActivityFromAxisSummary(
+      semanticProfile.diagnostics?.empathyPracticality,
+      this.config.epsilon,
+    );
+    const zActivity = EpistemicProfiler.projectionActivityFromAxisSummary(
+      semanticProfile.diagnostics?.wisdomKnowledge,
+      this.config.epsilon,
+    );
+
     const projection = EpistemicProfiler.projectSemanticTriple(a, s, b, {
       epsilon: this.config.epsilon,
+      xActivity,
+      zActivity,
     });
 
     const finalized = {
@@ -1347,23 +1336,29 @@ export class EpistemicProfiler {
             yCoverage:
               String.raw`y\_{coverage} = \frac{\sum gate\_weights\_{covered}}{\sum gate\_weights\_{all}}`,
             projection:
-              String.raw`(x,y,z) = \frac{(a,s,b)}{|a| + |s| + |b|}\;\text{when}\;|a| + |s| + |b| > 0`,
+              String.raw`\text{if } |a|+|b|>0,\; x = \frac{a}{|a|+|b|}(1-|s|),\; y = s,\; z = \frac{b}{|a|+|b|}(1-|s|)`,
             originRule: String.raw`|a| + |s| + |b| = 0 \Rightarrow (x,y,z) = (0,0,0)`,
-            surfaceRule: String.raw`|x| + |y| + |z| = 1\;\text{for active worldview positions}`,
+            surfaceRule: String.raw`|x| + |y| + |z| = 1\;\text{when signed lateral direction is available}`,
           },
           values: {
             a,
             b,
             s,
             yCoverage,
+            xActivity,
+            zActivity,
             x: projection.point.x,
             y: projection.point.y,
             z: projection.point.z,
-            semanticMagnitude: projection.debug.magnitude,
+            semanticMagnitude:
+              Math.abs(projection.debug.xSemantic) +
+              Math.abs(projection.debug.ySemantic) +
+              Math.abs(projection.debug.zSemantic),
+            projectionMode: projection.debug.projectionMode,
+            unresolvedLateralBudget: projection.debug.unresolvedLateralBudget,
           },
           sources: {
             entryCount: this.state.entries.length,
-            evidenceCount: this.getAllEvidence().length,
             compactSignalCount: this.getAllCompactSignals().length,
             gateEventCount: semanticProfile.diagnostics.epistemicStability.gateEventCount,
             principleCount: this.state.profileState.core_principles.length,
