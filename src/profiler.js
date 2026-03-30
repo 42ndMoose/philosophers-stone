@@ -69,6 +69,33 @@ const DEFAULT_LOCAL_Y_SIGNAL_WEIGHTS = {
   },
 };
 
+const DEFAULT_SOFT_NEGATIVE_SIGNAL_TYPES = new Set([
+  "false_certainty",
+  "dogmatic_closure",
+  "strawman_dependence",
+  "broad_motive_attribution",
+  "legacy_negative",
+]);
+
+const DEFAULT_GATE_TO_LOCAL_SIGNAL_MAP = {
+  positive: {
+    G1_counter_consideration: "counter_consideration",
+    G2_non_strawman: "non_strawman_fairness",
+    G3_self_correction: "self_correction",
+    G4_contradiction_handling: "coherence",
+    G5_reality_contact: "reality_contact",
+    G6_non_self_sealing: "revision_openness",
+  },
+  negative: {
+    G1_counter_consideration: "dogmatic_closure",
+    G2_non_strawman: "strawman_dependence",
+    G3_self_correction: "false_certainty",
+    G4_contradiction_handling: "contradiction_evasion",
+    G5_reality_contact: "reality_detachment",
+    G6_non_self_sealing: "self_sealing",
+  },
+};
+
 const DEFAULT_EMPTY_PROFILE_STATE = () => ({
   core_principles: [],
   core_boundaries: [],
@@ -155,9 +182,13 @@ export class EpistemicProfiler {
       },
       compactSignalScale: 0.65,
       integrationInfluence: 0.35,
-      positiveGateInfluence: 0.35,
-      negativeGateInfluence: 0.45,
+      positiveGateInfluence: 0.55,
+      negativeGateInfluence: 0.35,
       contradictionPenaltyScale: 0.22,
+      softNegativeSignalScale: 0.45,
+      hardNegativeSignalScale: 1.0,
+      gateDerivedSignalScale: 1.0,
+      gateToLocalSignalMap: cloneJSON(DEFAULT_GATE_TO_LOCAL_SIGNAL_MAP),
       epsilon: 1e-9,
       ...options,
     };
@@ -605,6 +636,59 @@ export class EpistemicProfiler {
     return Number(bucket?.[signalType]) || 1;
   }
 
+  isSoftNegativeSignal(signal) {
+    const signalType = cleanString(signal?.signal_type).toLowerCase();
+    return DEFAULT_SOFT_NEGATIVE_SIGNAL_TYPES.has(signalType);
+  }
+
+  deriveGateBackfilledLocalSignals(entry) {
+    const out = { positive: [], negative: [] };
+    const seen = {
+      positive: new Set(
+        (entry.local_y_positive_signals || [])
+          .map((signal) => cleanString(signal?.signal_type).toLowerCase())
+          .filter(Boolean),
+      ),
+      negative: new Set(
+        (entry.local_y_negative_signals || [])
+          .map((signal) => cleanString(signal?.signal_type).toLowerCase())
+          .filter(Boolean),
+      ),
+    };
+
+    for (const event of entry.triggered_gate_events || []) {
+      const polarity = cleanString(event?.direction).toLowerCase();
+      if (!["positive", "negative"].includes(polarity)) continue;
+      const mappedSignal =
+        this.config.gateToLocalSignalMap?.[polarity]?.[event.gate] ||
+        DEFAULT_GATE_TO_LOCAL_SIGNAL_MAP?.[polarity]?.[event.gate];
+      const signalType = cleanString(mappedSignal).toLowerCase();
+      if (!signalType || seen[polarity].has(signalType)) continue;
+
+      if (polarity === "negative" && entry.local_y_negative_signals?.length) {
+        continue;
+      }
+
+      const confidence = EpistemicProfiler.clamp(
+        Number(event.confidence ?? 1) * Number(this.config.gateDerivedSignalScale ?? 1),
+        0,
+        1,
+      );
+
+      out[polarity].push({
+        polarity,
+        signal_type: signalType,
+        strength: cleanString(event.strength).toLowerCase() || "moderate",
+        confidence,
+        evidence_span: normalizeEvidenceSpan(event.evidence_span),
+        derived_from_gate: event.gate,
+      });
+      seen[polarity].add(signalType);
+    }
+
+    return out;
+  }
+
   buildFallbackProfileLine(entry) {
     const parts = [];
     const strongestY = [...entry.local_y_positive_signals, ...entry.local_y_negative_signals]
@@ -974,28 +1058,55 @@ export class EpistemicProfiler {
 
   aggregateY() {
     let positiveSum = 0;
-    let negativeSum = 0;
+    let softNegativeSum = 0;
+    let hardNegativeSum = 0;
     let contradictionPenalty = 0;
     let positiveSignalCount = 0;
     let negativeSignalCount = 0;
+    let derivedPositiveSignalCount = 0;
+    let derivedNegativeSignalCount = 0;
 
     for (const entry of this.state.entries) {
       const scopeWeight = this.scopeWeight(entry.analysis_scope);
       contradictionPenalty += this.contradictionPenaltyForEntry(entry);
 
-      for (const signal of entry.local_y_positive_signals || []) {
-        positiveSum += this.axisContributionValue(signal, scopeWeight) * this.localYSignalWeight(signal);
+      const derivedSignals = this.deriveGateBackfilledLocalSignals(entry);
+      const positiveSignals = [
+        ...(entry.local_y_positive_signals || []),
+        ...(derivedSignals.positive || []),
+      ];
+      const negativeSignals = [
+        ...(entry.local_y_negative_signals || []),
+        ...(derivedSignals.negative || []),
+      ];
+
+      derivedPositiveSignalCount += (derivedSignals.positive || []).length;
+      derivedNegativeSignalCount += (derivedSignals.negative || []).length;
+
+      for (const signal of positiveSignals) {
+        positiveSum +=
+          this.axisContributionValue(signal, scopeWeight) * this.localYSignalWeight(signal);
         positiveSignalCount += 1;
       }
-      for (const signal of entry.local_y_negative_signals || []) {
-        negativeSum += this.axisContributionValue(signal, scopeWeight) * this.localYSignalWeight(signal);
+      for (const signal of negativeSignals) {
+        const weightedValue =
+          this.axisContributionValue(signal, scopeWeight) * this.localYSignalWeight(signal);
+        if (this.isSoftNegativeSignal(signal)) {
+          softNegativeSum += weightedValue;
+        } else {
+          hardNegativeSum += weightedValue;
+        }
         negativeSignalCount += 1;
       }
     }
 
+    const effectiveNegativeSum =
+      softNegativeSum * Number(this.config.softNegativeSignalScale ?? 1) +
+      hardNegativeSum * Number(this.config.hardNegativeSignalScale ?? 1);
+
     const saturation = this.config.axisSaturation.epistemicStability ?? 2.5;
     const local_y_base = EpistemicProfiler.clamp(
-      (positiveSum - negativeSum - contradictionPenalty * this.config.contradictionPenaltyScale) /
+      (positiveSum - effectiveNegativeSum - contradictionPenalty * this.config.contradictionPenaltyScale) /
         saturation,
       -1,
       1,
@@ -1004,6 +1115,8 @@ export class EpistemicProfiler {
     const gateWeightsTotal = Object.values(this.config.gateWeights).reduce((sum, value) => sum + value, 0);
     let weightedPositiveScoreSum = 0;
     let weightedNegativeScoreSum = 0;
+    let weightedPositiveGateWeight = 0;
+    let weightedNegativeGateWeight = 0;
     let weightedCoveredSum = 0;
     let gateEventCount = 0;
 
@@ -1015,16 +1128,18 @@ export class EpistemicProfiler {
       gateEventCount += data.positive_events + data.negative_events;
       if (data.score > 0) {
         weightedPositiveScoreSum += weight * data.score;
+        weightedPositiveGateWeight += weight;
       } else if (data.score < 0) {
         weightedNegativeScoreSum += weight * Math.abs(data.score);
+        weightedNegativeGateWeight += weight;
       }
     }
 
-    const weightedMeanPositiveGateScores = gateWeightsTotal > 0
-      ? weightedPositiveScoreSum / gateWeightsTotal
+    const weightedMeanPositiveGateScores = weightedPositiveGateWeight > 0
+      ? weightedPositiveScoreSum / weightedPositiveGateWeight
       : 0;
-    const weightedMeanNegativeGateScores = gateWeightsTotal > 0
-      ? weightedNegativeScoreSum / gateWeightsTotal
+    const weightedMeanNegativeGateScores = weightedNegativeGateWeight > 0
+      ? weightedNegativeScoreSum / weightedNegativeGateWeight
       : 0;
 
     const persistent_gate_bonus =
@@ -1047,7 +1162,9 @@ export class EpistemicProfiler {
       y_coverage,
       local_y_base,
       positiveSum,
-      negativeSum,
+      softNegativeSum,
+      hardNegativeSum,
+      negativeSum: effectiveNegativeSum,
       contradictionPenalty,
       persistent_gate_bonus,
       persistent_gate_penalty,
@@ -1055,6 +1172,8 @@ export class EpistemicProfiler {
       weightedMeanNegativeGateScores,
       positiveSignalCount,
       negativeSignalCount,
+      derivedPositiveSignalCount,
+      derivedNegativeSignalCount,
       gateEventCount,
     };
   }
@@ -1070,7 +1189,7 @@ export class EpistemicProfiler {
     const yCoverage = epistemicStability.y_coverage;
 
     return {
-      model: "epistemic_octahedron_profiler_v4",
+      model: "epistemic_octahedron_profiler_v5",
       semantics: {
         a,
         b,
