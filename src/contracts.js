@@ -1,29 +1,32 @@
-const CANON_LAYER_KEYS = ["core", "supporting", "conditional"];
 
-const CORE_CONTRACT = `EPISTEMIC OCTAHEDRON EXTRACTOR CONTRACT
-version: 4.2-lite
+const SIGNAL_GUIDANCE = `EPISTEMIC OCTAHEDRON EXTRACTOR CONTRACT
+version: 5.0
 
-ROLE
-You are an extractor only.
-Return structured evidence from the input.
-Do not compute final scores, maturity percentages, or final x y z coordinates.
+PURPOSE
+The LLM is an extractor only.
+It does not compute final scores, maturity percentages, or coordinates.
 
-PRIORITY
-This contract is optimized for the current profiler implementation.
-Only include fields the profiler uses directly or tolerates as optional metadata.
+OUTPUT DISCIPLINE
+Return valid JSON only.
 Prefer under-calling over over-calling.
-If context is missing, suppress the item.
+Extract portable philosophical structure, not incidental surface dressing.
 
-WHAT TO EXTRACT
-1. analysis_scope
-2. local_extraction
-3. axis_events
-4. local_y_positive_signals
-5. local_y_negative_signals
-6. triggered_gate_events
-7. profile_update_signals
-8. optional short profile summary line
-9. optional notes
+REQUIRED TOP-LEVEL FIELDS
+- model
+- analysis_scope
+- local_extraction
+- axis_events
+- local_y_positive_signals
+- local_y_negative_signals
+- triggered_gate_events
+- profile_update_signals
+
+OPTIONAL TOP-LEVEL FIELDS
+- scope_strength
+- statement_modes
+- profile
+- notes
+- canonOptimization
 
 SCOPE
 analysis_scope must be one of:
@@ -32,11 +35,18 @@ analysis_scope must be one of:
 - worldview_fragment
 - full_profile_import
 
-OPTIONAL METADATA
-You may include:
-- scope_strength = low | medium | high
-- statement_modes = literal_claim | analogy | rhetorical_generalization | norm | self_description
-These are optional and should not crowd out the core extraction.
+scope_strength may be:
+- low
+- medium
+- high
+
+STATEMENT MODES
+statement_modes may include:
+- literal_claim
+- analogy
+- rhetorical_generalization
+- norm
+- self_description
 
 LOCAL EXTRACTION
 local_extraction may include:
@@ -46,12 +56,8 @@ local_extraction may include:
 - tradeoffs
 - contradictions
 
-Use only portable philosophical structure.
-Remove incidental names or examples when they are not needed for the principle itself.
-If an item depends on missing context, do not emit it.
-
 AXIS EVENTS
-Do not emit final axis scores.
+Do not emit final x or z values.
 Emit evidence only.
 
 For x axis:
@@ -62,26 +68,27 @@ For z axis:
 - z_pole_evidence with pole = wisdom or knowledge
 - z_integration_events with type = explicit_balance or fair_tradeoff or integrated_tension
 
-For every pole evidence item, include:
+Every pole evidence item must include:
+- pole
 - strength = weak | moderate | strong
 - confidence from 0.5 to 1.0
 - evidence_span
 
-IMPORTANT AXIS RULES
-- If one pole is clearly dominant and the other is merely acknowledged, do not weight them equally.
-- Mentioning the opposite pole is not enough to make it strong opposite-pole evidence.
-- Recognition of the other side can instead belong in tradeoffs, integration events, counter_consideration, or notes.
-- Only emit explicit_balance when the text genuinely presents both poles as equally integrated.
+IMPORTANT
+Acknowledging the opposite pole is not the same as emphasizing it.
+If one pole is primary and the other is only acknowledged, counterweighted, or mentioned in passing:
+- weight the primary pole stronger
+- weight the acknowledged pole weaker
+Do not output equal opposite-pole emphasis unless the text genuinely presents both poles as equally integrated.
 
 LOCAL Y SIGNALS
-Emit local epistemic-stability signals from the current input only.
-Each local y signal should include:
+Every local y signal should include:
 - type
 - strength
 - confidence
 - evidence_span
 
-Positive types:
+Positive types may include:
 - counter_consideration
 - self_correction
 - reality_contact
@@ -90,7 +97,7 @@ Positive types:
 - revision_openness
 - non_strawman_fairness
 
-Negative types:
+Negative types may include:
 - false_certainty
 - self_sealing
 - contradiction_evasion
@@ -100,8 +107,8 @@ Negative types:
 - strawman_dependence
 - broad_motive_attribution
 
-META-EPISTEMIC GATES
-Use only these six gates:
+TRIGGERED GATE EVENTS
+Use only these gates:
 - G1_counter_consideration
 - G2_non_strawman
 - G3_self_correction
@@ -109,11 +116,7 @@ Use only these six gates:
 - G5_reality_contact
 - G6_non_self_sealing
 
-Only emit triggered_gate_events when the text gives actual evidence for or against the gate.
-Silence is neutral.
-Do not emit gate failures by absence.
-
-Each triggered_gate_event should include:
+Each triggered_gate_event must include:
 - gate
 - direction = positive or negative
 - strength = weak | moderate | strong
@@ -122,7 +125,7 @@ Each triggered_gate_event should include:
 - evidence_span
 
 Do not use direction = mixed.
-If the text shows mixed epistemic evidence, express that through local_y_positive_signals and local_y_negative_signals, not through an invalid gate direction.
+If the evidence is mixed, express that through local_y_positive_signals and local_y_negative_signals instead.
 
 PROFILE UPDATE SIGNALS
 profile_update_signals may include:
@@ -137,137 +140,69 @@ profile_update_signals may include:
 - retractions
 - restatements
 
-Use canon memory as context for update signals, not as something to parrot back.
+PROFILE SUMMARY LINE
+profile is display text only.
+Keep it concise.
+Do not put numbers, percentages, coordinates, or projection math in it.
 
-OPTIONAL PROFILE SUMMARY
-profile is optional display text only.
-If included, keep it to one or two short plain-language lines.
-Do not put numeric axis values, percentages, coordinates, or projection math in it.
+OPTIONAL CANON OPTIMIZATION
+If you can clearly improve canon memory without losing important meaning, you may include:
 
-OPTIONAL NOTES
-notes is optional.
-Use it for short cautions or clarification that do not belong in structured fields.
-
-DO NOT INCLUDE
-- final coordinates
-- maturity percentages
-- projection math
-- canonUpdate
-- geometry explanations
-- null state or peak-maturity explanations
-- any extra top-level field not listed below
-
-REQUIRED JSON SHAPE
-{
-  "model": "epistemic_octahedron_interpreter_v2",
-  "analysis_scope": "thought | stance | worldview_fragment | full_profile_import",
-  "local_extraction": {
-    "principles": [],
-    "boundaries": [],
-    "claimed_values": [],
-    "tradeoffs": [],
-    "contradictions": []
-  },
-  "axis_events": {
-    "x_pole_evidence": [],
-    "x_integration_events": [],
-    "z_pole_evidence": [],
-    "z_integration_events": []
-  },
-  "local_y_positive_signals": [],
-  "local_y_negative_signals": [],
-  "triggered_gate_events": [],
-  "profile_update_signals": {
-    "new_principles": [],
-    "refined_principles": [],
-    "new_boundaries": [],
-    "refined_boundaries": [],
-    "resolved_contradictions": [],
-    "introduced_contradictions": [],
-    "cleared_gates": [],
-    "failed_gates": [],
-    "retractions": [],
-    "restatements": []
-  },
-  "profile": [],
+"canonOptimization": {
+  "action": "maintain | merge | replace",
+  "principles": [],
+  "boundaries": [],
   "notes": []
 }
 
-OPTIONAL TOP-LEVEL FIELDS
-- scope_strength
-- statement_modes
+Rules for canonOptimization:
+- keep it lean
+- merge duplicates
+- shorten wording when meaning is preserved
+- prefer fewer, cleaner items
+- do not omit important distinctions
+- do not invent canon items not supported by the current input plus current canon memory
 
 FINAL INSTRUCTION
 Return valid JSON only.`;
 
 function normalizeList(items = []) {
-  return items.map((item) => String(item || "").trim()).filter(Boolean);
+  return (Array.isArray(items) ? items : [items])
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
 }
 
-function createEmptyLayeredCanon() {
-  return Object.fromEntries(CANON_LAYER_KEYS.map((key) => [key, []]));
-}
-
-function normalizeLayeredCanon(input = {}) {
-  const layered = createEmptyLayeredCanon();
-
-  if (Array.isArray(input)) {
-    layered.core = normalizeList(input);
-    return layered;
-  }
-
-  if (!input || typeof input !== "object") {
-    return layered;
-  }
-
-  for (const key of CANON_LAYER_KEYS) {
-    layered[key] = normalizeList(input[key]);
-  }
-
-  return layered;
-}
-
-function hasAnyLayeredItems(layered = {}) {
-  return CANON_LAYER_KEYS.some(
-    (key) => Array.isArray(layered[key]) && layered[key].length,
-  );
-}
-
-function formatLayeredSection(title, layeredInput = {}) {
-  const layered = normalizeLayeredCanon(layeredInput);
-  const lines = [title];
-  for (const key of CANON_LAYER_KEYS) {
-    const pretty = key.charAt(0).toUpperCase() + key.slice(1);
-    const items = layered[key];
-    if (!items.length) {
-      lines.push(`${pretty}: none`);
-      continue;
-    }
-    lines.push(`${pretty}:`);
-    lines.push(...items.map((item) => `- ${item}`));
-  }
-  return lines.join("\n");
+function flattenLayeredCanon(input = {}) {
+  if (Array.isArray(input)) return normalizeList(input);
+  if (!input || typeof input !== "object") return [];
+  return normalizeList([
+    ...(input.core || []),
+    ...(input.supporting || []),
+    ...(input.conditional || []),
+  ]);
 }
 
 function formatSimpleListSection(title, items = []) {
   const clean = normalizeList(items);
-  if (!clean.length) {
-    return `${title}: none`;
-  }
+  if (!clean.length) return `${title}: none`;
   return [title, ...clean.map((item) => `- ${item}`)].join("\n");
 }
 
 function formatProfilerMemorySection(memory = {}) {
-  const corePrinciples = normalizeList(memory.core_principles || memory.corePrinciples || []);
-  const coreBoundaries = normalizeList(memory.core_boundaries || memory.coreBoundaries || []);
+  const corePrinciples = normalizeList(
+    memory.core_principles || memory.corePrinciples || [],
+  );
+  const coreBoundaries = normalizeList(
+    memory.core_boundaries || memory.coreBoundaries || [],
+  );
   const metaMarkers = normalizeList(
     memory.meta_epistemic_markers || memory.metaEpistemicMarkers || [],
   );
   const riskNotes = normalizeList(memory.risk_notes || memory.riskNotes || []);
 
   return [
-    formatSimpleListSection("Profiler memory: core principles", corePrinciples),
-    formatSimpleListSection("Profiler memory: core boundaries", coreBoundaries),
+    formatSimpleListSection("Profiler memory: principles", corePrinciples),
+    formatSimpleListSection("Profiler memory: boundaries", coreBoundaries),
     formatSimpleListSection("Profiler memory: meta-epistemic markers", metaMarkers),
     formatSimpleListSection("Profiler memory: risk notes", riskNotes),
   ].join("\n\n");
@@ -291,28 +226,32 @@ function formatComputedSection(computed = {}) {
   return lines.join("\n");
 }
 
-export {
-  CANON_LAYER_KEYS,
-  createEmptyLayeredCanon,
-  normalizeLayeredCanon,
-  hasAnyLayeredItems,
-};
-
 export function buildLLMPacket({
   profileText = "",
+  principles = [],
+  boundaries = [],
   principlesByLayer = {},
   boundariesByLayer = {},
   profilerMemory = {},
 } = {}) {
   const cleanProfileText = String(profileText || "").trim();
+  const canonPrinciples = normalizeList([
+    ...flattenLayeredCanon(principlesByLayer),
+    ...normalizeList(principles),
+  ]);
+  const canonBoundaries = normalizeList([
+    ...flattenLayeredCanon(boundariesByLayer),
+    ...normalizeList(boundaries),
+  ]);
+
   const sections = [
     "SYSTEM FRAME",
     "You are reading one extractor contract and one schema for the Epistemic Octahedron pipeline.",
-    "Return JSON only.",
+    "Interpret the user text semantically and return JSON only.",
     "",
     "CANON MEMORY",
-    formatLayeredSection("Principles by layer", principlesByLayer),
-    formatLayeredSection("Boundaries by layer", boundariesByLayer),
+    formatSimpleListSection("Principles", canonPrinciples),
+    formatSimpleListSection("Boundaries", canonBoundaries),
     "",
     "PROFILER MEMORY",
     formatProfilerMemorySection(profilerMemory),
@@ -320,7 +259,7 @@ export function buildLLMPacket({
     "USER PROFILE INPUT",
     cleanProfileText || "[no profile text provided]",
     "",
-    CORE_CONTRACT,
+    SIGNAL_GUIDANCE,
   ];
 
   return sections.join("\n");
@@ -375,3 +314,6 @@ export function buildProfilerAssessmentPacket({
 
   return sections.join("\n");
 }
+
+export const CANON_LAYER_KEYS = ["core", "supporting", "conditional"];
+export { flattenLayeredCanon };
