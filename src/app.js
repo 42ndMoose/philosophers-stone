@@ -1013,7 +1013,7 @@ function buildMathDump(result) {
   const math = finalizedData.math || {};
 
   return [
-    "stored_params = {",
+    "semantic_params = {",
     `  a: ${formatSigned(semantics.a)},`,
     `  b: ${formatSigned(semantics.b)},`,
     `  s: ${formatSigned(semantics.s)},`,
@@ -1023,7 +1023,10 @@ function buildMathDump(result) {
     `  wisdomPercent: ${formatPercent(uiLike.wisdomPercent ?? 50)},`,
     `  knowledgePercent: ${formatPercent(uiLike.knowledgePercent ?? 50)},`,
     `  stabilityPercent: ${formatPercent(uiLike.stabilityPercent ?? 0)},`,
-    `  coveragePercent: ${formatPercent(uiLike.coveragePercent ?? 0)},`,
+    `  coveragePercent: ${formatPercent(uiLike.coveragePercent ?? 0)}`,
+    "}",
+    "",
+    "projected_surface_point = {",
     `  x: ${formatCoord(point.x)},`,
     `  y: ${formatCoord(point.y)},`,
     `  z: ${formatCoord(point.z)}`,

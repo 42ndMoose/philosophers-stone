@@ -108,6 +108,82 @@ const DEFAULT_EMPTY_PROFILE_STATE = () => ({
   risk_notes: [],
 });
 
+
+const DEFAULT_AXIS_TIE_BREAK_INFLUENCE = 0.35;
+
+const AXIS_TIE_BREAK_KEYWORDS = {
+  empathyPracticality: {
+    positive: [
+      ["empathy", 2.0],
+      ["compassion", 1.8],
+      ["kindness", 1.4],
+      ["comfort", 1.2],
+      ["feelings", 1.1],
+      ["relational", 1.1],
+      ["care", 1.0],
+      ["mercy", 1.2],
+      ["humane", 1.2],
+      ["fairness", 0.8],
+      ["bullied", 1.0],
+      ["harm", 0.8],
+      ["protect", 0.6],
+    ],
+    negative: [
+      ["practical", 1.8],
+      ["practicality", 2.0],
+      ["health", 1.7],
+      ["health failure", 2.0],
+      ["outcome", 1.2],
+      ["outcomes", 1.2],
+      ["feasible", 1.1],
+      ["feasibility", 1.3],
+      ["logistics", 1.2],
+      ["consequence", 1.3],
+      ["consequences", 1.3],
+      ["long-term", 1.3],
+      ["utility", 1.1],
+      ["viability", 1.4],
+      ["survival", 1.5],
+      ["reality", 1.0],
+      ["teachable", 0.9],
+      ["criticism", 0.7],
+    ],
+  },
+  wisdomKnowledge: {
+    positive: [
+      ["wisdom", 2.0],
+      ["synthesis", 1.7],
+      ["proportion", 1.4],
+      ["context", 1.2],
+      ["judgment", 1.3],
+      ["insight", 1.2],
+      ["broader", 1.0],
+      ["all things considered", 1.8],
+      ["coexist", 1.1],
+      ["dialogue", 0.9],
+      ["mature", 0.9],
+      ["integrated", 1.2],
+      ["collective conscience", 1.0],
+      ["conscience", 0.7],
+    ],
+    negative: [
+      ["knowledge", 2.0],
+      ["literal", 1.2],
+      ["observation", 1.1],
+      ["facts", 1.2],
+      ["fact", 1.2],
+      ["data", 1.1],
+      ["precision", 1.0],
+      ["technical", 1.1],
+      ["information", 1.2],
+      ["pattern", 1.0],
+      ["patterns", 1.0],
+      ["detail", 0.9],
+      ["details", 0.9],
+    ],
+  },
+};
+
 function cloneJSON(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -134,6 +210,36 @@ function cleanStringList(items = []) {
       return "";
     })
     .filter(Boolean);
+}
+
+function escapeRegex(text) {
+  return String(text || "").replace(/[-\/\^$*+?.()|[\]{}]/g, "\\$&");
+}
+
+function keywordWeightFromText(value, weightedTerms = []) {
+  const hay = ` ${String(value || "").toLowerCase()} `;
+  let total = 0;
+  for (const [term, weight] of weightedTerms) {
+    const pattern = new RegExp(`\\b${escapeRegex(term)}\\b`, "g");
+    const matches = hay.match(pattern);
+    if (matches?.length) total += matches.length * Number(weight || 0);
+  }
+  return total;
+}
+
+function collectTextSnippets(value) {
+  if (typeof value === "string") return [value];
+  if (!value || typeof value !== "object") return [];
+  const out = [];
+  for (const key of ["normalized", "evidence_span", "claim_a", "claim_b", "reason", "note"]) {
+    if (typeof value[key] === "string" && value[key].trim()) out.push(value[key]);
+  }
+  if (Array.isArray(value.evidence_spans)) {
+    for (const item of value.evidence_spans) {
+      if (typeof item === "string" && item.trim()) out.push(item);
+    }
+  }
+  return out;
 }
 
 function dedupeLatestFirst(items = []) {
@@ -334,22 +440,27 @@ export class EpistemicProfiler {
     return "low";
   }
 
-  normalizeAxisEventList(items = []) {
-    if (!Array.isArray(items)) return [];
-    return items
-      .map((item) => {
-        if (!item || typeof item !== "object") return null;
-        return {
-          ...item,
-          strength: cleanString(item.strength).toLowerCase() || "moderate",
-          confidence: EpistemicProfiler.clamp(Number(item.confidence ?? 1), 0, 1),
-          evidence_span: normalizeEvidenceSpan(item.evidence_span || item.excerpt || item.reason),
-        };
-      })
-      .filter(Boolean);
-  }
 
-  normalizeSignalList(items = [], fallbackPolarity = "positive") {
+normalizeAxisEventList(items = []) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const hasExplicitStrength = cleanString(item.strength).length > 0;
+      const hasExplicitConfidence = item.confidence !== undefined && item.confidence !== null && `${item.confidence}` !== "";
+      return {
+        ...item,
+        strength: cleanString(item.strength).toLowerCase() || "moderate",
+        confidence: EpistemicProfiler.clamp(Number(item.confidence ?? 1), 0, 1),
+        evidence_span: normalizeEvidenceSpan(item.evidence_span || item.excerpt || item.reason),
+        _strength_explicit: hasExplicitStrength,
+        _confidence_explicit: hasExplicitConfidence,
+      };
+    })
+    .filter(Boolean);
+}
+
+normalizeSignalList(items = [], fallbackPolarity = "positive") {
     if (!Array.isArray(items)) return [];
     return items
       .map((item) => {
@@ -939,11 +1050,54 @@ export class EpistemicProfiler {
     return this.state.entries.flatMap((entry) => entry.compactSignals || []);
   }
 
-  axisContributionValue(item, scopeWeight) {
-    const strength = this.strengthWeight(item?.strength);
-    const confidence = EpistemicProfiler.clamp(Number(item?.confidence ?? 1), 0, 1);
-    return strength * confidence * scopeWeight;
-  }
+
+ axisContributionValue(item, scopeWeight) {
+   const strength = this.strengthWeight(item?.strength);
+   const confidence = EpistemicProfiler.clamp(Number(item?.confidence ?? 1), 0, 1);
+   return strength * confidence * scopeWeight;
+ }
+
+ entryAxisTieBreakBias(entry, axisKey) {
+   const keywordSet = AXIS_TIE_BREAK_KEYWORDS[axisKey];
+   if (!keywordSet) {
+     return { bias: 0, positiveScore: 0, negativeScore: 0, snippets: 0 };
+   }
+
+   const snippets = [];
+   snippets.push(...cleanStringList(entry.display_profile_lines || []));
+   snippets.push(...cleanStringList(entry.notes || []));
+
+   for (const key of ["principles", "boundaries", "claimed_values", "tradeoffs", "contradictions"]) {
+     for (const item of entry.local_extraction?.[key] || []) {
+       snippets.push(...collectTextSnippets(item));
+     }
+   }
+
+   const poleKey = axisKey === "empathyPracticality" ? "x_pole_evidence" : "z_pole_evidence";
+   const integrationKey = axisKey === "empathyPracticality" ? "x_integration_events" : "z_integration_events";
+   for (const item of entry.axis_events?.[poleKey] || []) {
+     snippets.push(...collectTextSnippets(item));
+   }
+   for (const item of entry.axis_events?.[integrationKey] || []) {
+     snippets.push(...collectTextSnippets(item));
+   }
+
+   const corpus = snippets.filter(Boolean).join("\n");
+   if (!corpus.trim()) {
+     return { bias: 0, positiveScore: 0, negativeScore: 0, snippets: 0 };
+   }
+
+   const positiveScore = keywordWeightFromText(corpus, keywordSet.positive);
+   const negativeScore = keywordWeightFromText(corpus, keywordSet.negative);
+   const total = positiveScore + negativeScore;
+   const bias = total > 0 ? (positiveScore - negativeScore) / total : 0;
+   return {
+     bias: EpistemicProfiler.clamp(bias, -1, 1),
+     positiveScore,
+     negativeScore,
+     snippets: snippets.length,
+   };
+ }
 
   aggregateLateralAxis(axisKey) {
     const poleKey = axisKey === "empathyPracticality" ? "x_pole_evidence" : "z_pole_evidence";
@@ -956,38 +1110,90 @@ export class EpistemicProfiler {
     let negativeTotal = 0;
     let integrationTotal = 0;
     let sourceCount = 0;
+    let explicitPoleWeightCount = 0;
+    let defaultedPoleWeightCount = 0;
+    let explicitBalanceCount = 0;
+    let tieBiasAccumulator = 0;
+    let tieBiasWeight = 0;
+    let tieBreakPositiveScore = 0;
+    let tieBreakNegativeScore = 0;
 
     for (const entry of this.state.entries) {
       const scopeWeight = this.scopeWeight(entry.analysis_scope);
+      let entryHasPositive = false;
+      let entryHasNegative = false;
 
       for (const item of entry.axis_events[poleKey] || []) {
         const value = this.axisContributionValue(item, scopeWeight);
-        if (cleanString(item.pole).toLowerCase() === positivePole) positiveTotal += value;
-        if (cleanString(item.pole).toLowerCase() === negativePole) negativeTotal += value;
+        const pole = cleanString(item.pole).toLowerCase();
+        if (pole === positivePole) {
+          positiveTotal += value;
+          entryHasPositive = true;
+        }
+        if (pole === negativePole) {
+          negativeTotal += value;
+          entryHasNegative = true;
+        }
+        if (item._strength_explicit || item._confidence_explicit) explicitPoleWeightCount += 1;
+        else defaultedPoleWeightCount += 1;
         sourceCount += 1;
       }
 
       for (const item of entry.axis_events[integrationKey] || []) {
         integrationTotal += this.axisContributionValue(item, scopeWeight);
+        if (cleanString(item.type).toLowerCase() === "explicit_balance") explicitBalanceCount += 1;
         sourceCount += 1;
       }
 
       for (const signal of entry.compactSignals || []) {
         if (signal.axis !== axisKey) continue;
-        const weight = Math.abs(Number(signal.value) || 0) * this.config.compactSignalScale;
+        const value = Number(signal.value);
+        if (!Number.isFinite(value)) continue;
+        const weight = Math.abs(value) * this.config.compactSignalScale;
         if (weight <= 0) continue;
-        if ((Number(signal.value) || 0) >= 0) positiveTotal += weight;
+        if (value >= 0) positiveTotal += weight;
         else negativeTotal += weight;
         sourceCount += 1;
+      }
+
+      if (entryHasPositive && entryHasNegative) {
+        const tieBreak = this.entryAxisTieBreakBias(entry, axisKey);
+        if (Math.abs(tieBreak.bias) > this.config.epsilon) {
+          tieBiasAccumulator += tieBreak.bias * scopeWeight;
+          tieBiasWeight += scopeWeight;
+          tieBreakPositiveScore += tieBreak.positiveScore;
+          tieBreakNegativeScore += tieBreak.negativeScore;
+        }
       }
     }
 
     const poleMagnitude = positiveTotal + negativeTotal;
-    const poleDelta = positiveTotal - negativeTotal;
     const saturation = this.config.axisSaturation[axisKey] ?? 2.5;
     const integrationRatio = poleMagnitude + integrationTotal > 0
       ? integrationTotal / (poleMagnitude + integrationTotal)
       : 0;
+
+    let poleDelta = positiveTotal - negativeTotal;
+    const defaultWeightedBalance =
+      poleMagnitude > this.config.epsilon &&
+      positiveTotal > this.config.epsilon &&
+      negativeTotal > this.config.epsilon &&
+      Math.abs(poleDelta) <= this.config.epsilon &&
+      explicitPoleWeightCount === 0;
+
+    let tieBreakApplied = false;
+    let tieBreakBias = 0;
+    let tieBreakDelta = 0;
+    if (defaultWeightedBalance && explicitBalanceCount === 0 && tieBiasWeight > this.config.epsilon) {
+      tieBreakBias = EpistemicProfiler.clamp(tieBiasAccumulator / tieBiasWeight, -1, 1);
+      tieBreakDelta =
+        tieBreakBias * poleMagnitude * (this.config.axisTieBreakInfluence ?? DEFAULT_AXIS_TIE_BREAK_INFLUENCE);
+      if (Math.abs(tieBreakDelta) > this.config.epsilon) {
+        poleDelta += tieBreakDelta;
+        tieBreakApplied = true;
+      }
+    }
+
     const moderatedDelta = poleDelta * (1 - integrationRatio * this.config.integrationInfluence);
     const raw = poleMagnitude <= this.config.epsilon
       ? 0
@@ -1005,6 +1211,15 @@ export class EpistemicProfiler {
       moderatedDelta,
       saturation,
       sourceCount,
+      explicitPoleWeightCount,
+      defaultedPoleWeightCount,
+      explicitBalanceCount,
+      defaultWeightedBalance,
+      tieBreakApplied,
+      tieBreakBias,
+      tieBreakDelta,
+      tieBreakPositiveScore,
+      tieBreakNegativeScore,
     };
   }
 
@@ -1303,12 +1518,31 @@ export class EpistemicProfiler {
     return `${parts.join(" ")} | compiled aggregate`;
   }
 
-  buildSupportingNotes() {
-    return dedupeLatestFirst([
-      ...this.state.entries.flatMap((entry) => entry.notes || []),
-      ...this.state.profileState.risk_notes,
-    ]);
+
+buildSupportingNotes() {
+  const semanticProfile = this.getSemanticProfile();
+  const axisNotes = [];
+  for (const axis of [semanticProfile.diagnostics?.empathyPracticality, semanticProfile.diagnostics?.wisdomKnowledge]) {
+    if (!axis) continue;
+    if (axis.defaultWeightedBalance) {
+      const label = axis.axis === "empathyPracticality" ? "X" : "Z";
+      if (axis.tieBreakApplied) {
+        axisNotes.push(
+          `${label} axis tie-broken from under-specified opposing poles using local extraction text.`,
+        );
+      } else {
+        axisNotes.push(
+          `${label} axis opposing poles arrived with equal default weights and no explicit balance weighting.`,
+        );
+      }
+    }
   }
+  return dedupeLatestFirst([
+    ...this.state.entries.flatMap((entry) => entry.notes || []),
+    ...this.state.profileState.risk_notes,
+    ...axisNotes,
+  ]);
+}
 
   computePoint() {
     const semanticProfile = this.getSemanticProfile();
@@ -1360,6 +1594,7 @@ export class EpistemicProfiler {
             y: projection.point.y,
             z: projection.point.z,
             semanticMagnitude: projection.debug.magnitude,
+            projectedManhattan: projection.debug.manhattan ?? 0,
           },
           sources: {
             entryCount: this.state.entries.length,

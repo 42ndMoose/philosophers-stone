@@ -101,6 +101,7 @@ local_extraction may include:
 AXIS EVENTS
 Do not emit final x or z scores.
 Emit evidence instead.
+Do not leave lateral pole events under-weighted by omission.
 
 For x axis:
 - x_pole_evidence with pole = empathy or practicality
@@ -110,10 +111,20 @@ For z axis:
 - z_pole_evidence with pole = wisdom or knowledge
 - z_integration_events with type = explicit_balance or fair_tradeoff or integrated_tension
 
+For every pole evidence item, include:
+- strength = weak | moderate | strong
+- confidence from 0.5 to 1.0
+- evidence_span
+
+If one pole is primary and the other is only acknowledged or counterweighted, do not give them equal default emphasis.
+Use stronger weighting for the dominant pole and weaker weighting for the acknowledged pole.
+Only emit explicit_balance when the text genuinely presents both poles as equally integrated.
+
 LOCAL Y SIGNALS
 Emit local epistemic-stability signals from the current input only.
 
 Positive signal types may include:
+Each local y signal should include strength, confidence, and evidence_span.
 - counter_consideration
 - self_correction
 - reality_contact
