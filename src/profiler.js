@@ -306,6 +306,8 @@ export class EpistemicProfiler {
       hardNegativeSignalScale: 1.0,
       gateDerivedSignalScale: 1.0,
       gateToLocalSignalMap: cloneJSON(DEFAULT_GATE_TO_LOCAL_SIGNAL_MAP),
+      axisAcknowledgementMultiplier: 0.45,
+      rejectInvalidTriggeredGateEvents: false,
       epsilon: 1e-9,
       summaryAxisFloor: 0.04,
       ...options,
@@ -479,26 +481,80 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
       .filter(Boolean);
   }
 
+  axisAcknowledgementMultiplier(item = {}) {
+    const span = normalizeEvidenceSpan(item.evidence_span || item.excerpt || item.reason).toLowerCase();
+    if (!span) return 1;
+
+    const strongAcknowledgement = [
+      /\backnowledg(?:e|es|ed|ment)\b.*\bbut\b.*\bdeprioriti[sz](?:e|es|ed|ing)\b/i,
+      /\brecogniz(?:e|es|ed)\b.*\bbut\b.*\bdeprioriti[sz](?:e|es|ed|ing)\b/i,
+      /\bexists\b.*\bbut\b.*\bdeprioriti[sz](?:e|es|ed|ing)\b/i,
+      /\bonly acknowledged\b/i,
+      /\bmerely acknowledged\b/i,
+      /\backnowledged competing consideration\b/i,
+      /\bcounterweighted\b/i,
+      /\bdeprioriti[sz](?:e|es|ed|ing)\b/i,
+      /\bsecondary\b/i,
+      /\bsubordinate\b/i,
+      /\bnot primary\b/i,
+    ];
+    if (strongAcknowledgement.some((pattern) => pattern.test(span))) {
+      return Number(this.config.axisAcknowledgementMultiplier ?? 0.45);
+    }
+
+    const mildAcknowledgement = [
+      /\backnowledg(?:e|es|ed|ment)\b/i,
+      /\brecogniz(?:e|es|ed)\b/i,
+      /\badmit(?:s|ted)?\b/i,
+      /\bnotes?\b/i,
+      /\baware of\b/i,
+      /\bexists\b/i,
+      /\bpresent\b/i,
+      /\bimpulse to\b/i,
+    ];
+    if (mildAcknowledgement.some((pattern) => pattern.test(span))) {
+      return 0.75;
+    }
+
+    return 1;
+  }
+
   normalizeGateEvents(items = []) {
-    if (!Array.isArray(items)) return [];
-    return items
-      .map((item) => {
-        if (!item || typeof item !== "object") return null;
-        const gate = cleanString(item.gate);
-        if (!gate || !(gate in this.state.gateStates)) return null;
-        const direction = cleanString(item.direction).toLowerCase();
-        if (!["positive", "negative"].includes(direction)) return null;
-        return {
-          gate,
-          direction,
-          strength: cleanString(item.strength).toLowerCase() || "moderate",
-          confidence: EpistemicProfiler.clamp(Number(item.confidence ?? 1), 0.5, 1),
-          novelty: EpistemicProfiler.clamp(Number(item.novelty ?? 1), 0, 1),
-          evidence_span: normalizeEvidenceSpan(item.evidence_span || item.reason),
-          scope: cleanString(item.scope),
-        };
-      })
-      .filter(Boolean);
+    if (!Array.isArray(items)) return { accepted: [], rejected: [] };
+
+    const accepted = [];
+    const rejected = [];
+
+    for (const item of items) {
+      if (!item || typeof item !== "object") {
+        rejected.push({ reason: "non_object_gate_event", raw: item });
+        continue;
+      }
+
+      const gate = cleanString(item.gate);
+      if (!gate || !(gate in this.state.gateStates)) {
+        rejected.push({ reason: "unknown_gate", raw: item });
+        continue;
+      }
+
+      const direction = cleanString(item.direction).toLowerCase();
+      if (!["positive", "negative"].includes(direction)) {
+        rejected.push({ reason: "invalid_gate_direction", raw: item, gate, direction });
+        continue;
+      }
+
+      accepted.push({
+        gate,
+        direction,
+        strength: cleanString(item.strength).toLowerCase() || "moderate",
+        confidence: EpistemicProfiler.clamp(Number(item.confidence ?? 1), 0.5, 1),
+        novelty: EpistemicProfiler.clamp(Number(item.novelty ?? 1), 0, 1),
+        evidence_span: normalizeEvidenceSpan(item.evidence_span || item.reason),
+        scope: cleanString(item.scope),
+      });
+    }
+
+    return { accepted, rejected };
   }
 
   normalizeLocalExtraction(input = {}) {
@@ -895,7 +951,9 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
       payload.profile_update_signals || {},
     );
 
-    const explicitGateEvents = this.normalizeGateEvents(payload.triggered_gate_events || []);
+    const normalizedGateResult = this.normalizeGateEvents(payload.triggered_gate_events || []);
+    const explicitGateEvents = normalizedGateResult.accepted;
+    const invalidGateEvents = normalizedGateResult.rejected;
     const triggered_gate_events = [
       ...explicitGateEvents,
       ...this.gateEventsFromProfileUpdates(profile_update_signals, explicitGateEvents),
@@ -916,11 +974,27 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
       profile_update_signals,
       compactSignals: compact.compactSignals,
       legacyEvidence: Array.isArray(payload.evidence) ? cloneJSON(payload.evidence) : [],
+      invalidGateEvents,
     };
   }
 
   addLLMOutput(payload) {
     const entry = this.normalizePayload(payload);
+
+    if (entry.invalidGateEvents?.length) {
+      const messages = entry.invalidGateEvents
+        .map((item) => {
+          const gate = cleanString(item?.gate || item?.raw?.gate) || "unknown gate";
+          const direction = cleanString(item?.direction || item?.raw?.direction) || "missing direction";
+          const reason = cleanString(item?.reason).replace(/_/g, " ") || "invalid gate event";
+          return `${gate}: ${reason}${direction ? ` (${direction})` : ""}`;
+        })
+        .join("; ");
+      if (this.config.rejectInvalidTriggeredGateEvents) {
+        throw new Error(`Invalid triggered_gate_events detected: ${messages}`);
+      }
+      entry.notes.push(`invalid gate events ignored: ${messages}`);
+    }
 
     const hasSignals =
       entry.legacyEvidence.length ||
@@ -1051,10 +1125,13 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
   }
 
 
- axisContributionValue(item, scopeWeight) {
+ axisContributionValue(item, scopeWeight, options = {}) {
    const strength = this.strengthWeight(item?.strength);
    const confidence = EpistemicProfiler.clamp(Number(item?.confidence ?? 1), 0, 1);
-   return strength * confidence * scopeWeight;
+   const acknowledgementMultiplier = options.applyAcknowledgementDamping
+     ? this.axisAcknowledgementMultiplier(item)
+     : 1;
+   return strength * confidence * scopeWeight * acknowledgementMultiplier;
  }
 
  entryAxisTieBreakBias(entry, axisKey) {
@@ -1124,7 +1201,7 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
       let entryHasNegative = false;
 
       for (const item of entry.axis_events[poleKey] || []) {
-        const value = this.axisContributionValue(item, scopeWeight);
+        const value = this.axisContributionValue(item, scopeWeight, { applyAcknowledgementDamping: true });
         const pole = cleanString(item.pole).toLowerCase();
         if (pole === positivePole) {
           positiveTotal += value;

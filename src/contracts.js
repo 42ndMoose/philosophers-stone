@@ -118,6 +118,7 @@ For every pole evidence item, include:
 
 If one pole is primary and the other is only acknowledged or counterweighted, do not give them equal default emphasis.
 Use stronger weighting for the dominant pole and weaker weighting for the acknowledged pole.
+Acknowledging the opposite pole, noting that it exists, or saying it is deprioritized does not by itself justify strong opposite-pole weight.
 Only emit explicit_balance when the text genuinely presents both poles as equally integrated.
 
 LOCAL Y SIGNALS
@@ -159,6 +160,9 @@ Each triggered_gate_event should include:
 - confidence from 0.5 to 1.0
 - novelty from 0.0 to 1.0 when possible
 - evidence_span
+
+Never use direction = mixed for triggered_gate_events.
+If the evidence is mixed, express that through local_y_positive_signals and local_y_negative_signals, and only emit a gate event for the side that is actually warranted.
 
 PROFILE UPDATE SIGNALS
 profile_update_signals may include:
