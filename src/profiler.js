@@ -307,7 +307,7 @@ export class EpistemicProfiler {
       gateDerivedSignalScale: 1.0,
       gateToLocalSignalMap: cloneJSON(DEFAULT_GATE_TO_LOCAL_SIGNAL_MAP),
       axisAcknowledgementMultiplier: 0.45,
-      rejectInvalidTriggeredGateEvents: false,
+      rejectInvalidTriggeredGateEvents: true,
       epsilon: 1e-9,
       summaryAxisFloor: 0.04,
       ...options,
