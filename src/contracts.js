@@ -1,94 +1,42 @@
 const CANON_LAYER_KEYS = ["core", "supporting", "conditional"];
 
-const CORE_CONTRACT = `EPISTEMIC OCTAHEDRON INTERPRETER CONTRACT
-version: 4.1
+const CORE_CONTRACT = `EPISTEMIC OCTAHEDRON EXTRACTOR CONTRACT
+version: 4.2-lite
 
-PURPOSE
-The Epistemic Octahedron models active worldview structure on an octahedral surface.
-The LLM is an extractor only.
-It does not compute final scores, maturity percentages, or final x y z coordinates.
+ROLE
+You are an extractor only.
+Return structured evidence from the input.
+Do not compute final scores, maturity percentages, or final x y z coordinates.
 
-PIPELINE
-System -> LLM -> Profiler -> Visualizer
+PRIORITY
+This contract is optimized for the current profiler implementation.
+Only include fields the profiler uses directly or tolerates as optional metadata.
+Prefer under-calling over over-calling.
+If context is missing, suppress the item.
 
-GEOMETRIC REFERENCE
-Active worldview positions are projected onto the octahedron surface:
-|x| + |y| + |z| = 1
+WHAT TO EXTRACT
+1. analysis_scope
+2. local_extraction
+3. axis_events
+4. local_y_positive_signals
+5. local_y_negative_signals
+6. triggered_gate_events
+7. profile_update_signals
+8. optional short profile summary line
+9. optional notes
 
-Axis signs are fixed:
-- x < 0 = Practicality
-- x > 0 = Empathy
-- z < 0 = Knowledge
-- z > 0 = Wisdom
-- y < 0 = Negative Epistemic Stability
-- y = 0 = Epistemic Borderline
-- y > 0 = Positive Epistemic Stability
-
-NULL STATE AND COLLAPSE
-The coordinate origin (0, 0, 0) is the pre-philosophical null state.
-The lower vertex (0, -1, 0) is epistemic collapse.
-The upper vertex (0, 1, 0) is objective peak philosophical maturity.
-
-CORE SEMANTIC DIMENSIONS
-Empathy:
-- human concern
-- relational weighting
-- felt impact
-- moral sensitivity
-
-Practicality:
-- feasibility
-- logistics
-- instrumental constraints
-- utility under pressure
-
-Wisdom:
-- judgment
-- synthesis
-- proportion
-- context-sensitive understanding
-
-Knowledge:
-- facts
-- literal precision
-- technical detail
-- information grasp
-
-Epistemic stability:
-- reality contact
-- coherence
-- self-correction
-- resistance to self-sealing distortion
-
-EXTRACTION RULES
-1. Extract portable structure, not final verdicts.
-2. Prefer under-calling over over-calling.
-3. Use evidence_span whenever possible.
-4. Only emit triggered gate events when the text gives actual evidence for or against a gate.
-5. Silence is neutral. Do not emit gate failures by absence.
-6. Do not compute the final plot.
-7. Do not let display labels or prior canon wording bias extraction.
-8. Use canon memory as context, not as something to parrot back.
-
-SCOPE CLASSIFICATION
-Always classify the input as one of:
+SCOPE
+analysis_scope must be one of:
 - thought
 - stance
 - worldview_fragment
 - full_profile_import
 
-Also emit scope_strength as:
-- low
-- medium
-- high
-
-STATEMENT MODES
-You may emit one or more of:
-- literal_claim
-- analogy
-- rhetorical_generalization
-- norm
-- self_description
+OPTIONAL METADATA
+You may include:
+- scope_strength = low | medium | high
+- statement_modes = literal_claim | analogy | rhetorical_generalization | norm | self_description
+These are optional and should not crowd out the core extraction.
 
 LOCAL EXTRACTION
 local_extraction may include:
@@ -98,10 +46,13 @@ local_extraction may include:
 - tradeoffs
 - contradictions
 
+Use only portable philosophical structure.
+Remove incidental names or examples when they are not needed for the principle itself.
+If an item depends on missing context, do not emit it.
+
 AXIS EVENTS
-Do not emit final x or z scores.
-Emit evidence instead.
-Do not leave lateral pole events under-weighted by omission.
+Do not emit final axis scores.
+Emit evidence only.
 
 For x axis:
 - x_pole_evidence with pole = empathy or practicality
@@ -116,16 +67,21 @@ For every pole evidence item, include:
 - confidence from 0.5 to 1.0
 - evidence_span
 
-If one pole is primary and the other is only acknowledged or counterweighted, do not give them equal default emphasis.
-Use stronger weighting for the dominant pole and weaker weighting for the acknowledged pole.
-Acknowledging the opposite pole, noting that it exists, or saying it is deprioritized does not by itself justify strong opposite-pole weight.
-Only emit explicit_balance when the text genuinely presents both poles as equally integrated.
+IMPORTANT AXIS RULES
+- If one pole is clearly dominant and the other is merely acknowledged, do not weight them equally.
+- Mentioning the opposite pole is not enough to make it strong opposite-pole evidence.
+- Recognition of the other side can instead belong in tradeoffs, integration events, counter_consideration, or notes.
+- Only emit explicit_balance when the text genuinely presents both poles as equally integrated.
 
 LOCAL Y SIGNALS
 Emit local epistemic-stability signals from the current input only.
+Each local y signal should include:
+- type
+- strength
+- confidence
+- evidence_span
 
-Positive signal types may include:
-Each local y signal should include strength, confidence, and evidence_span.
+Positive types:
 - counter_consideration
 - self_correction
 - reality_contact
@@ -134,7 +90,7 @@ Each local y signal should include strength, confidence, and evidence_span.
 - revision_openness
 - non_strawman_fairness
 
-Negative signal types may include:
+Negative types:
 - false_certainty
 - self_sealing
 - contradiction_evasion
@@ -153,16 +109,20 @@ Use only these six gates:
 - G5_reality_contact
 - G6_non_self_sealing
 
+Only emit triggered_gate_events when the text gives actual evidence for or against the gate.
+Silence is neutral.
+Do not emit gate failures by absence.
+
 Each triggered_gate_event should include:
 - gate
 - direction = positive or negative
-- strength = weak moderate or strong
+- strength = weak | moderate | strong
 - confidence from 0.5 to 1.0
 - novelty from 0.0 to 1.0 when possible
 - evidence_span
 
-Never use direction = mixed for triggered_gate_events.
-If the evidence is mixed, express that through local_y_positive_signals and local_y_negative_signals, and only emit a gate event for the side that is actually warranted.
+Do not use direction = mixed.
+If the text shows mixed epistemic evidence, express that through local_y_positive_signals and local_y_negative_signals, not through an invalid gate direction.
 
 PROFILE UPDATE SIGNALS
 profile_update_signals may include:
@@ -177,25 +137,30 @@ profile_update_signals may include:
 - retractions
 - restatements
 
-PROFILE SUMMARY LINE
-The profile array is display text only.
-Keep it plain-language.
+Use canon memory as context for update signals, not as something to parrot back.
+
+OPTIONAL PROFILE SUMMARY
+profile is optional display text only.
+If included, keep it to one or two short plain-language lines.
 Do not put numeric axis values, percentages, coordinates, or projection math in it.
 
-OPTIONAL CANON UPDATE
-If canon memory clearly needs maintenance, you may include canonUpdate.
-If you include principlesByLayer or boundariesByLayer, output the full next state for that section.
-Keep canon lean.
+OPTIONAL NOTES
+notes is optional.
+Use it for short cautions or clarification that do not belong in structured fields.
+
+DO NOT INCLUDE
+- final coordinates
+- maturity percentages
+- projection math
+- canonUpdate
+- geometry explanations
+- null state or peak-maturity explanations
+- any extra top-level field not listed below
 
 REQUIRED JSON SHAPE
 {
   "model": "epistemic_octahedron_interpreter_v2",
   "analysis_scope": "thought | stance | worldview_fragment | full_profile_import",
-  "scope_strength": "low | medium | high",
-  "statement_modes": [],
-  "profile": [
-    "short display summary only"
-  ],
   "local_extraction": {
     "principles": [],
     "boundaries": [],
@@ -224,22 +189,13 @@ REQUIRED JSON SHAPE
     "retractions": [],
     "restatements": []
   },
-  "notes": [],
-  "canonUpdate": {
-    "action": "maintain | replace | update | add | obsolete | refine",
-    "principlesByLayer": {
-      "core": [],
-      "supporting": [],
-      "conditional": []
-    },
-    "boundariesByLayer": {
-      "core": [],
-      "supporting": [],
-      "conditional": []
-    },
-    "notes": []
-  }
+  "profile": [],
+  "notes": []
 }
+
+OPTIONAL TOP-LEVEL FIELDS
+- scope_strength
+- statement_modes
 
 FINAL INSTRUCTION
 Return valid JSON only.`;
@@ -351,9 +307,8 @@ export function buildLLMPacket({
   const cleanProfileText = String(profileText || "").trim();
   const sections = [
     "SYSTEM FRAME",
-    "You are reading one contract and one schema for the Epistemic Octahedron pipeline.",
-    "Interpret the user text semantically and return JSON only.",
-    "You may include canonUpdate when canon memory clearly needs maintenance.",
+    "You are reading one extractor contract and one schema for the Epistemic Octahedron pipeline.",
+    "Return JSON only.",
     "",
     "CANON MEMORY",
     formatLayeredSection("Principles by layer", principlesByLayer),
