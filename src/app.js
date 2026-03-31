@@ -2,7 +2,6 @@
 import {
   buildLLMPacket,
   buildProfilerAssessmentPacket,
-  flattenLayeredCanon,
 } from "./contracts.js";
 import { AVATARS, getAvatarById, pickAvatarFromPoint } from "./avatars.js";
 import { EpistemicProfiler } from "./profiler.js";
@@ -10,25 +9,32 @@ import { EpistemicProfiler } from "./profiler.js";
 const STORAGE_KEY = "philosophers-stone-workspace-v5";
 const BUTTON_RESET_MS = 1500;
 const DIAMOND_RANGE_PERCENT = 34;
-const MAX_CANON_ITEMS = 12;
 
-const NOTE_TOOLTIP_MAP = {
-  "G1 counter consideration": "Recognizes a real opposing consideration instead of pretending there is none.",
-  "G2 non strawman": "Represents the opposing side fairly enough to avoid caricature.",
-  "G3 self correction": "Shows willingness to revise or admit being wrong when warranted.",
-  "G4 contradiction handling": "Faces contradiction honestly instead of hiding or hand-waving it.",
-  "G5 reality contact": "Keeps contact with reality, constraints, tradeoffs, and consequences.",
-  "G6 non self sealing": "Avoids making the view unfalsifiable or closed against correction.",
-  "strawman dependence": "Leans on caricaturing the opposing side instead of addressing it fairly.",
-  "broad motive attribution": "Attributes sweeping motives to large groups without enough support.",
-  "false certainty": "Speaks with unwarranted certainty despite limited evidence or nuance.",
-  "dogmatic closure": "Closes discussion prematurely instead of remaining open to correction.",
-  "reality detachment": "Reasoning drifts away from observable constraints or consequences.",
-  "contradiction evasion": "Avoids or hides internal tension instead of confronting it.",
-  "counter consideration": "Shows awareness that real opposing considerations exist.",
-  "self correction": "Shows willingness to correct or revise oneself.",
-  "reality contact": "Shows tethering to real-world outcomes, constraints, or consequences.",
-  "non strawman fairness": "Represents the opposing side in recognizable rather than distorted terms.",
+const GATE_DEFINITIONS = {
+  G1_counter_consideration: "Recognizes a real opposing consideration instead of pretending none exists.",
+  G2_non_strawman: "Represents the opposing side fairly enough to stay in contact with reality.",
+  G3_self_correction: "Allows that the speaker could be wrong and open to revision.",
+  G4_contradiction_handling: "Faces contradiction honestly instead of dodging or hand-waving it.",
+  G5_reality_contact: "Stays tethered to real constraints, outcomes, and lived consequences.",
+  G6_non_self_sealing: "Avoids making the argument unfalsifiable or closed against correction.",
+};
+
+const SIGNAL_DEFINITIONS = {
+  counter_consideration: "Shows awareness of a real competing consideration.",
+  self_correction: "Shows willingness to revise or correct oneself.",
+  reality_contact: "Stays grounded in real constraints, outcomes, or consequences.",
+  coherence: "The argument holds together internally.",
+  error_awareness: "Shows awareness of possible mistakes or limits.",
+  revision_openness: "Shows openness to changing position when warranted.",
+  non_strawman_fairness: "Represents the opposing view in recognizable terms before criticizing it.",
+  false_certainty: "Presents certainty without enough room for correction.",
+  self_sealing: "Frames the view so criticism cannot really count against it.",
+  contradiction_evasion: "Dodges contradiction rather than dealing with it.",
+  reality_detachment: "Loses contact with real-world constraint or consequence.",
+  dogmatic_closure: "Closes inquiry too quickly.",
+  collapse_marker: "Shows strong epistemic breakdown or reality-collapse markers.",
+  strawman_dependence: "Leans on a caricature of the opposing side.",
+  broad_motive_attribution: "Assigns sweeping motives too broadly without enough grounding.",
 };
 
 const els = {
@@ -69,17 +75,100 @@ const els = {
   profileEntriesCount: document.getElementById("profileEntriesCount"),
   profileNotesCount: document.getElementById("profileNotesCount"),
   canonLists: {
-    principles: document.getElementById("principlesList"),
-    boundaries: document.getElementById("boundariesList"),
+    principles: {
+      items: document.getElementById("principlesList"),
+      suggested: document.getElementById("principlesSuggestedList"),
+    },
+    boundaries: {
+      items: document.getElementById("boundariesList"),
+      suggested: document.getElementById("boundariesSuggestedList"),
+    },
   },
 };
 
 const profiler = new EpistemicProfiler();
 
+function createCanonItem(text, pinned = false, id = null) {
+  return {
+    id: id || (globalThis.crypto?.randomUUID?.() || `canon-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`),
+    text: String(text || "").trim(),
+    pinned: Boolean(pinned),
+  };
+}
+
+function canonKey(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildEmptyCanonBucket() {
+  return { items: [], suggested: [] };
+}
+
 function buildEmptyCanonState() {
   return {
-    principles: [],
-    boundaries: [],
+    principles: buildEmptyCanonBucket(),
+    boundaries: buildEmptyCanonBucket(),
+  };
+}
+
+function normalizeCanonItems(items = []) {
+  const out = [];
+  const seen = new Set();
+  for (const item of Array.isArray(items) ? items : [items]) {
+    const obj = item && typeof item === "object" && !Array.isArray(item)
+      ? createCanonItem(item.text || item.value || item.normalized || "", item.pinned, item.id)
+      : createCanonItem(item);
+    if (!obj.text) continue;
+    const key = canonKey(obj.text);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(obj);
+  }
+  return out;
+}
+
+function normalizeCanonBucket(input) {
+  const bucket = buildEmptyCanonBucket();
+  if (Array.isArray(input)) {
+    bucket.items = normalizeCanonItems(input);
+    return bucket;
+  }
+  if (!input || typeof input !== "object") return bucket;
+  if (Array.isArray(input.items) || Array.isArray(input.suggested)) {
+    bucket.items = normalizeCanonItems(input.items || []);
+    bucket.suggested = normalizeCanonItems(input.suggested || []);
+    return bucket;
+  }
+  const flattened = [
+    ...(Array.isArray(input.core) ? input.core : []),
+    ...(Array.isArray(input.supporting) ? input.supporting : []),
+    ...(Array.isArray(input.conditional) ? input.conditional : []),
+  ];
+  bucket.items = normalizeCanonItems(flattened);
+  return bucket;
+}
+
+function normalizeCanonState(input) {
+  return {
+    principles: normalizeCanonBucket(input?.principles),
+    boundaries: normalizeCanonBucket(input?.boundaries),
+  };
+}
+
+function cloneCanon(canon = buildEmptyCanonState()) {
+  return {
+    principles: {
+      items: normalizeCanonItems(canon.principles?.items || canon.principles || []),
+      suggested: normalizeCanonItems(canon.principles?.suggested || []),
+    },
+    boundaries: {
+      items: normalizeCanonItems(canon.boundaries?.items || canon.boundaries || []),
+      suggested: normalizeCanonItems(canon.boundaries?.suggested || []),
+    },
   };
 }
 
@@ -96,76 +185,6 @@ const state = {
   avatarPickerOpen: false,
   mathOpen: false,
 };
-
-function normalizeCanonText(value) {
-  return String(value || "")
-    .replace(/\s+/g, " ")
-    .replace(/[“”]/g, '"')
-    .replace(/[‘’]/g, "'")
-    .trim();
-}
-
-function canonKey(value) {
-  return normalizeCanonText(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\b(a|an|the)\b/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function tokensOf(text) {
-  return canonKey(text).split(" ").filter(Boolean);
-}
-
-function nearDuplicateCanon(a, b) {
-  const keyA = canonKey(a);
-  const keyB = canonKey(b);
-  if (!keyA || !keyB) return false;
-  if (keyA === keyB) return true;
-  if (keyA.includes(keyB) || keyB.includes(keyA)) return true;
-  const aTokens = new Set(tokensOf(a));
-  const bTokens = new Set(tokensOf(b));
-  const overlap = [...aTokens].filter((token) => bTokens.has(token)).length;
-  const minSize = Math.min(aTokens.size, bTokens.size) || 1;
-  return overlap / minSize >= 0.85;
-}
-
-function preferCanonWording(currentText, nextText) {
-  const current = normalizeCanonText(currentText);
-  const next = normalizeCanonText(nextText);
-  if (!current) return next;
-  if (!next) return current;
-  if (next.length < current.length && nearDuplicateCanon(current, next)) return next;
-  return current;
-}
-
-function canonicalizeCanonList(items = [], maxItems = MAX_CANON_ITEMS) {
-  const out = [];
-  for (const raw of items) {
-    const text = normalizeCanonText(raw);
-    if (!text) continue;
-    const existingIndex = out.findIndex((item) => nearDuplicateCanon(item, text));
-    if (existingIndex >= 0) {
-      out[existingIndex] = preferCanonWording(out[existingIndex], text);
-      continue;
-    }
-    out.push(text);
-  }
-  return out.slice(0, maxItems);
-}
-
-function canonicalizeCanonState(canon = buildEmptyCanonState()) {
-  return {
-    principles: canonicalizeCanonList(canon.principles),
-    boundaries: canonicalizeCanonList(canon.boundaries),
-  };
-}
-
-function flattenCanonInput(input) {
-  if (Array.isArray(input)) return input.map(normalizeCanonText).filter(Boolean);
-  return flattenLayeredCanon(input).map(normalizeCanonText).filter(Boolean);
-}
 
 function formatPercent(value) {
   return `${Number(value).toFixed(1)}%`;
@@ -187,11 +206,8 @@ function getAvatarTitle(id) {
   return getAvatarById(id)?.title || "Unassigned";
 }
 
-function cloneCanon(canon = buildEmptyCanonState()) {
-  return {
-    principles: [...(canon.principles || [])],
-    boundaries: [...(canon.boundaries || [])],
-  };
+function canonTextList(type, section = "items") {
+  return (state.canon[type]?.[section] || []).map((item) => item.text);
 }
 
 function createExportableState() {
@@ -209,13 +225,6 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, serializeState());
 }
 
-function ensureCanonShape(input) {
-  return canonicalizeCanonState({
-    principles: flattenCanonInput(input?.principles),
-    boundaries: flattenCanonInput(input?.boundaries),
-  });
-}
-
 function migrateState(parsed = {}) {
   return {
     profileText: String(parsed.profileText || ""),
@@ -224,12 +233,10 @@ function migrateState(parsed = {}) {
     additionalInfo: String(parsed.additionalInfo || parsed.age || ""),
     selectedAvatarId: parsed.selectedAvatarId || null,
     manualAvatar: Boolean(parsed.manualAvatar),
-    canon: ensureCanonShape(
-      parsed.canon || {
-        principles: parsed.principles || [],
-        boundaries: parsed.boundaries || [],
-      },
-    ),
+    canon: normalizeCanonState(parsed.canon || {
+      principles: parsed.principles || [],
+      boundaries: parsed.boundaries || [],
+    }),
     latestCompile: parsed.latestCompile || null,
     compiledPayloads: Array.isArray(parsed.compiledPayloads) ? parsed.compiledPayloads : [],
     avatarPickerOpen: false,
@@ -293,27 +300,56 @@ function renderAvatars() {
   els.toggleAvatarGridBtn.setAttribute("aria-expanded", String(isOpen));
 }
 
-function makeCanonItem(text, type, index) {
+function sortCanonItems(type) {
+  const bucket = state.canon[type].items;
+  const pinned = bucket.filter((item) => item.pinned);
+  const unpinned = bucket.filter((item) => !item.pinned);
+  state.canon[type].items = [...pinned, ...unpinned];
+}
+
+function makeCanonItemElement(type, section, item, index) {
   const li = document.createElement("li");
-  li.className = "canon-item";
-  li.draggable = true;
+  li.className = `canon-item${item.pinned ? " is-pinned" : ""}`;
+  li.draggable = !item.pinned;
   li.dataset.type = type;
+  li.dataset.section = section;
   li.dataset.index = String(index);
   li.innerHTML = `
-    <span class="drag-pill">⋮⋮</span>
-    <div>${text}</div>
-    <button type="button" class="delete-item-btn" aria-label="Delete item">×</button>
+    <span class="drag-pill">${item.pinned ? "📌" : "⋮⋮"}</span>
+    <div class="canon-item-text">${item.text}</div>
+    <div class="canon-item-actions">
+      <button type="button" class="pin-item-btn${item.pinned ? " active" : ""}" aria-label="${item.pinned ? "Unpin item" : "Pin item"}" title="${item.pinned ? "Unpin item" : "Pin item"}">📌</button>
+      <button type="button" class="delete-item-btn" aria-label="Delete item" title="Delete item"${item.pinned ? " disabled" : ""}>×</button>
+    </div>
   `;
 
-  li.addEventListener("dragstart", () => li.classList.add("is-dragging"));
+  li.addEventListener("dragstart", () => {
+    if (item.pinned) return;
+    li.classList.add("is-dragging");
+  });
+
   li.addEventListener("dragend", () => {
     li.classList.remove("is-dragging");
     document.querySelectorAll(".canon-list").forEach((list) => list.classList.remove("is-drop-target"));
   });
 
   li.querySelector(".delete-item-btn").addEventListener("click", () => {
-    state.canon[type].splice(index, 1);
-    state.canon = canonicalizeCanonState(state.canon);
+    if (item.pinned) return;
+    state.canon[type][section].splice(index, 1);
+    renderCanonLists();
+    renderPacketPreview();
+    saveState();
+  });
+
+  li.querySelector(".pin-item-btn").addEventListener("click", () => {
+    if (section === "suggested") {
+      state.canon[type].suggested.splice(index, 1);
+      state.canon[type].items.unshift(createCanonItem(item.text, true));
+      sortCanonItems(type);
+    } else {
+      state.canon[type].items[index].pinned = !state.canon[type].items[index].pinned;
+      sortCanonItems(type);
+    }
     renderCanonLists();
     renderPacketPreview();
     saveState();
@@ -322,34 +358,39 @@ function makeCanonItem(text, type, index) {
   return li;
 }
 
-function attachDropBehavior(listEl, type) {
+function attachDropBehavior(listEl, type, section) {
   listEl.addEventListener("dragover", (event) => {
     const dragging = document.querySelector(".canon-item.is-dragging");
-    if (!dragging || dragging.dataset.type !== type) return;
+    if (!dragging) return;
+    if (dragging.dataset.type !== type || dragging.dataset.section !== section) return;
     event.preventDefault();
     listEl.classList.add("is-drop-target");
   });
 
-  listEl.addEventListener("dragleave", () => listEl.classList.remove("is-drop-target"));
+  listEl.addEventListener("dragleave", () => {
+    listEl.classList.remove("is-drop-target");
+  });
 
   listEl.addEventListener("drop", (event) => {
     const dragging = document.querySelector(".canon-item.is-dragging");
     listEl.classList.remove("is-drop-target");
-    if (!dragging || dragging.dataset.type !== type) return;
+    if (!dragging) return;
+    if (dragging.dataset.type !== type || dragging.dataset.section !== section) return;
     event.preventDefault();
 
+    const bucket = state.canon[type][section];
     const sourceIndex = Number(dragging.dataset.index);
-    const bucket = state.canon[type];
     const [moved] = bucket.splice(sourceIndex, 1);
     if (!moved) return;
 
-    const items = [...listEl.querySelectorAll(".canon-item:not(.is-dragging)")];
-    const after = items.find((item) => {
+    const candidates = [...listEl.querySelectorAll(".canon-item:not(.is-dragging):not(.is-pinned)")];
+    const after = candidates.find((item) => {
       const rect = item.getBoundingClientRect();
       return event.clientY < rect.top + rect.height / 2;
     });
     const targetIndex = after ? Number(after.dataset.index) : bucket.length;
     bucket.splice(targetIndex, 0, moved);
+    sortCanonItems(type);
     renderCanonLists();
     renderPacketPreview();
     saveState();
@@ -358,11 +399,18 @@ function attachDropBehavior(listEl, type) {
 
 function renderCanonLists() {
   for (const type of ["principles", "boundaries"]) {
-    const listEl = els.canonLists[type];
-    listEl.innerHTML = "";
-    const items = state.canon[type];
-    items.forEach((text, index) => {
-      listEl.appendChild(makeCanonItem(text, type, index));
+    sortCanonItems(type);
+    const itemsEl = els.canonLists[type].items;
+    const suggestedEl = els.canonLists[type].suggested;
+    itemsEl.innerHTML = "";
+    suggestedEl.innerHTML = "";
+
+    state.canon[type].items.forEach((item, index) => {
+      itemsEl.appendChild(makeCanonItemElement(type, "items", item, index));
+    });
+
+    state.canon[type].suggested.forEach((item, index) => {
+      suggestedEl.appendChild(makeCanonItemElement(type, "suggested", item, index));
     });
   }
 }
@@ -374,8 +422,10 @@ function getLatestProfilerMemory() {
 function buildPacket() {
   return buildLLMPacket({
     profileText: state.profileText,
-    principles: state.canon.principles,
-    boundaries: state.canon.boundaries,
+    currentPrinciples: canonTextList("principles", "items"),
+    currentBoundaries: canonTextList("boundaries", "items"),
+    suggestedPrinciples: canonTextList("principles", "suggested"),
+    suggestedBoundaries: canonTextList("boundaries", "suggested"),
     profilerMemory: getLatestProfilerMemory(),
   });
 }
@@ -389,12 +439,9 @@ function buildProfilerAssessment() {
   return buildProfilerAssessmentPacket({
     name: state.name,
     additionalInfo: state.additionalInfo,
-    avatar: getAvatarTitle(state.selectedAvatarId),
-    profileEntries: state.latestCompile?.result?.finalized?.profile || [],
-    notes: state.latestCompile?.result?.finalized?.notes || [],
     computed: {
       point: finalizedData.point,
-      uiLike: finalizedData.params?.uiLike,
+      coveragePercent: finalizedData.params?.uiLike?.coveragePercent,
     },
   });
 }
@@ -428,13 +475,7 @@ function cleanStringList(items = []) {
       if (typeof item === "string") return item.trim();
       if (item && typeof item === "object") {
         return String(
-          item.text ||
-            item.value ||
-            item.principle ||
-            item.boundary ||
-            item.normalized ||
-            item.reason ||
-            "",
+          item.text || item.value || item.principle || item.boundary || item.normalized || "",
         ).trim();
       }
       return "";
@@ -446,7 +487,6 @@ function countStructuredSignals(payload = {}) {
   const axisEvents = payload.axis_events || {};
   const localExtraction = payload.local_extraction || {};
   const profileUpdates = payload.profile_update_signals || {};
-
   return (
     (Array.isArray(payload.evidence) ? payload.evidence.length : 0) +
     EpistemicProfiler.parseCompactProfileSignals(cleanStringList(payload.profile || [])).length +
@@ -463,9 +503,7 @@ function countStructuredSignals(payload = {}) {
     (Array.isArray(localExtraction.tradeoffs) ? localExtraction.tradeoffs.length : 0) +
     (Array.isArray(localExtraction.contradictions) ? localExtraction.contradictions.length : 0) +
     (Array.isArray(profileUpdates.new_principles) ? profileUpdates.new_principles.length : 0) +
-    (Array.isArray(profileUpdates.new_boundaries) ? profileUpdates.new_boundaries.length : 0) +
-    (Array.isArray(profileUpdates.cleared_gates) ? profileUpdates.cleared_gates.length : 0) +
-    (Array.isArray(profileUpdates.failed_gates) ? profileUpdates.failed_gates.length : 0)
+    (Array.isArray(profileUpdates.new_boundaries) ? profileUpdates.new_boundaries.length : 0)
   );
 }
 
@@ -475,39 +513,8 @@ function payloadHasScorableSignals(payload = {}) {
 
 function setListCount(element, count, singularLabel, pluralLabel) {
   if (!element) return;
-  const resolvedPluralLabel =
-    pluralLabel || (singularLabel.endsWith("y") ? `${singularLabel.slice(0, -1)}ies` : `${singularLabel}s`);
-  const label = count === 1 ? singularLabel : resolvedPluralLabel;
-  element.textContent = `${count} ${label}`;
-}
-
-function stableStringify(value) {
-  if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item)).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.keys(value)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
-function fingerprintPayload(payload = {}) {
-  return stableStringify({
-    model: payload.model,
-    analysis_scope: payload.analysis_scope,
-    scope_strength: payload.scope_strength,
-    statement_modes: payload.statement_modes || [],
-    profile: payload.profile || [],
-    local_extraction: payload.local_extraction || {},
-    axis_events: payload.axis_events || {},
-    local_y_positive_signals: payload.local_y_positive_signals || [],
-    local_y_negative_signals: payload.local_y_negative_signals || [],
-    triggered_gate_events: payload.triggered_gate_events || [],
-    profile_update_signals: payload.profile_update_signals || {},
-    notes: payload.notes || [],
-    canonOptimization: payload.canonOptimization || payload.canonUpdate || null,
-  });
+  const resolvedPluralLabel = pluralLabel || (singularLabel.endsWith("y") ? `${singularLabel.slice(0, -1)}ies` : `${singularLabel}s`);
+  element.textContent = `${count} ${count === 1 ? singularLabel : resolvedPluralLabel}`;
 }
 
 function tryParseJSON(text) {
@@ -523,7 +530,6 @@ function findBalancedRange(text, openIndex, openChar, closeChar) {
   let depth = 0;
   let inString = false;
   let escape = false;
-
   for (let i = openIndex; i < text.length; i += 1) {
     const char = text[i];
     if (escape) {
@@ -539,11 +545,8 @@ function findBalancedRange(text, openIndex, openChar, closeChar) {
       continue;
     }
     if (inString) continue;
-    if (char === openChar) {
-      depth += 1;
-      continue;
-    }
-    if (char === closeChar) {
+    if (char === openChar) depth += 1;
+    else if (char === closeChar) {
       depth -= 1;
       if (depth === 0) return { start: openIndex, end: i + 1 };
     }
@@ -608,7 +611,7 @@ function parseLoosePayload(raw) {
     parseLooseObjectByKey(repaired, "canonOptimization") ||
     parseLooseObjectByKey(repaired, "canon_optimization") ||
     parseLooseObjectByKey(repaired, "canonUpdate") ||
-    parseLooseObjectByKey(repaired, "canon_update");
+    null;
 
   const hasAnything =
     profile.length ||
@@ -626,7 +629,7 @@ function parseLoosePayload(raw) {
 
   if (!hasAnything) return null;
 
-  const payload = {
+  return {
     model: modelMatch?.[1] || "epistemic_octahedron_interpreter_v2",
     profile,
     evidence,
@@ -637,9 +640,29 @@ function parseLoosePayload(raw) {
     triggered_gate_events,
     local_y_positive_signals,
     local_y_negative_signals,
+    canonOptimization,
   };
-  if (canonOptimization) payload.canonOptimization = canonOptimization;
-  return payload;
+}
+
+function extractCanonFromText(rawText = "") {
+  const lines = String(rawText || "").split("\n");
+  let section = "";
+  const principles = [];
+  const boundaries = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (/^principles?\b\s*:?$/i.test(trimmed)) { section = "principles"; continue; }
+    if (/^boundaries?\b\s*:?$/i.test(trimmed)) { section = "boundaries"; continue; }
+    const item = trimmed.replace(/^[-*\d.)\s]+/, "").trim();
+    if (!item) continue;
+    if (section === "principles") principles.push(item);
+    if (section === "boundaries") boundaries.push(item);
+  }
+  return {
+    principles: { items: normalizeCanonItems(principles), suggested: [] },
+    boundaries: { items: normalizeCanonItems(boundaries), suggested: [] },
+  };
 }
 
 function normalizeParsedPayload(parsed = {}) {
@@ -662,19 +685,15 @@ function normalizeParsedPayload(parsed = {}) {
     local_y_positive_signals: parsed.local_y_positive_signals || parsed.localYPositiveSignals || [],
     local_y_negative_signals: parsed.local_y_negative_signals || parsed.localYNegativeSignals || [],
     triggered_gate_events: parsed.triggered_gate_events || parsed.triggeredGateEvents || [],
-    canonOptimization:
-      parsed.canonOptimization ||
-      parsed.canon_optimization ||
-      parsed.canonUpdate ||
-      parsed.canon_update ||
-      undefined,
+    canonOptimization: parsed.canonOptimization || parsed.canon_optimization || parsed.canonUpdate || parsed.canon_update || undefined,
   };
 }
 
 function parseLLMOutput(raw) {
   const parsed = tryParseJSON(raw) || tryParseJSON(repairLikelyPayload(raw)) || parseLoosePayload(raw);
+  const canonFromText = extractCanonFromText(raw);
   if (parsed && typeof parsed === "object") {
-    return { payload: normalizeParsedPayload(parsed) };
+    return { payload: normalizeParsedPayload(parsed), canonFromText };
   }
   return {
     payload: {
@@ -689,67 +708,67 @@ function parseLLMOutput(raw) {
       local_y_negative_signals: [],
       triggered_gate_events: [],
     },
+    canonFromText,
   };
 }
 
 function extractCanonFromPayload(payload = {}) {
-  const optimization = payload.canonOptimization || payload.canonUpdate || {};
-  const action = String(optimization.action || optimization.mode || "").trim().toLowerCase();
-
-  const explicitPrinciples = flattenCanonInput(
-    optimization.principles || optimization.principlesByLayer || optimization.principles_by_layer || [],
-  );
-  const explicitBoundaries = flattenCanonInput(
-    optimization.boundaries || optimization.boundariesByLayer || optimization.boundaries_by_layer || [],
-  );
-
-  if (explicitPrinciples.length || explicitBoundaries.length) {
-    return {
-      mode: action === "replace" ? "replace" : action === "maintain" ? "maintain" : "merge",
-      canon: canonicalizeCanonState({
-        principles: explicitPrinciples,
-        boundaries: explicitBoundaries,
-      }),
-      notes: cleanStringList(optimization.notes || []),
-    };
-  }
-
-  const localExtraction = payload.local_extraction || {};
   const profileUpdates = payload.profile_update_signals || {};
+  const localExtraction = payload.local_extraction || {};
+  const optim = payload.canonOptimization || {};
 
-  const fallback = canonicalizeCanonState({
-    principles: cleanStringList([
-      ...(localExtraction.principles || []),
-      ...(profileUpdates.new_principles || []),
-      ...(profileUpdates.refined_principles || []),
-    ]),
-    boundaries: cleanStringList([
-      ...(localExtraction.boundaries || []),
-      ...(profileUpdates.new_boundaries || []),
-      ...(profileUpdates.refined_boundaries || []),
-    ]),
-  });
+  const explicitPrinciples = [
+    ...cleanStringList(profileUpdates.new_principles || []),
+    ...cleanStringList(profileUpdates.refined_principles || []),
+  ];
+  const explicitBoundaries = [
+    ...cleanStringList(profileUpdates.new_boundaries || []),
+    ...cleanStringList(profileUpdates.refined_boundaries || []),
+  ];
+
+  const fallbackPrinciples = cleanStringList(localExtraction.principles || []);
+  const fallbackBoundaries = cleanStringList(localExtraction.boundaries || []);
 
   return {
-    mode: action === "maintain" ? "maintain" : "merge",
-    canon: fallback,
-    notes: [],
+    canon: {
+      principles: {
+        items: normalizeCanonItems(explicitPrinciples.length ? explicitPrinciples : fallbackPrinciples),
+        suggested: normalizeCanonItems(optim.principles || optim.suggestedPrinciples || []),
+      },
+      boundaries: {
+        items: normalizeCanonItems(explicitBoundaries.length ? explicitBoundaries : fallbackBoundaries),
+        suggested: normalizeCanonItems(optim.boundaries || optim.suggestedBoundaries || []),
+      },
+    },
+    notes: cleanStringList(optim.notes || []),
   };
 }
 
-function applyCanonUpdate(targetCanon, extracted) {
-  const nextCanon = cloneCanon(targetCanon);
-  if (!extracted || extracted.mode === "maintain") return canonicalizeCanonState(nextCanon);
-  if (extracted.mode === "replace") return canonicalizeCanonState(extracted.canon);
+function mergeCanonItems(baseItems = [], newItems = []) {
+  const out = [...normalizeCanonItems(baseItems)];
+  const seen = new Set(out.map((item) => canonKey(item.text)));
+  for (const item of normalizeCanonItems(newItems)) {
+    const key = canonKey(item.text);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
 
-  return canonicalizeCanonState({
-    principles: [...nextCanon.principles, ...(extracted.canon.principles || [])],
-    boundaries: [...nextCanon.boundaries, ...(extracted.canon.boundaries || [])],
-  });
+function applyCanonUpdate(targetCanon, extracted) {
+  const next = cloneCanon(targetCanon);
+  if (!extracted || !extracted.canon) return next;
+  for (const type of ["principles", "boundaries"]) {
+    next[type].items = mergeCanonItems(next[type].items, extracted.canon[type].items || []);
+    next[type].suggested = normalizeCanonItems(extracted.canon[type].suggested || []);
+  }
+  return next;
 }
 
 function rebuildFromCompiledPayloads() {
   profiler.reset();
+  let workingCanon = buildEmptyCanonState();
   let previousStability = null;
   let lastPayload = null;
   let lastResult = null;
@@ -759,7 +778,10 @@ function rebuildFromCompiledPayloads() {
     profiler.addLLMOutput(payload);
     lastResult = profiler.computePoint();
     lastPayload = payload;
-    const nextStability = Number(lastResult.finalized?.data?.params?.uiLike?.stabilityPercent);
+
+    workingCanon = applyCanonUpdate(workingCanon, extractCanonFromPayload(payload));
+
+    const nextStability = Number(lastResult.finalized?.data?.point?.y);
     stabilityDelta =
       Number.isFinite(previousStability) && Number.isFinite(nextStability)
         ? nextStability - previousStability
@@ -767,64 +789,26 @@ function rebuildFromCompiledPayloads() {
     previousStability = nextStability;
   }
 
-  if (lastResult) {
-    const profileState = lastResult.finalized?.data?.diagnostics?.profileState || {};
-    const extractedCanon = state.compiledPayloads.reduce((acc, payload) => applyCanonUpdate(acc, extractCanonFromPayload(payload)), buildEmptyCanonState());
-    state.canon = canonicalizeCanonState({
-      principles: [...extractedCanon.principles, ...(profileState.core_principles || [])],
-      boundaries: [...extractedCanon.boundaries, ...(profileState.core_boundaries || [])],
-    });
-  } else {
-    state.canon = canonicalizeCanonState(state.canon);
-  }
-
+  state.canon = workingCanon;
   if (!lastPayload || !lastResult) {
     state.latestCompile = null;
     return;
   }
-
   state.latestCompile = {
     payload: lastPayload,
-    payloadFingerprint: fingerprintPayload(lastPayload),
     result: lastResult,
     stabilityDelta,
     compiledAt: new Date().toISOString(),
-  };
-}
-
-function summarizePayloadEntry(payload = {}) {
-  const profile = cleanStringList(payload.profile || []);
-  const notes = cleanStringList(payload.notes || []);
-  const principles = cleanStringList(payload?.local_extraction?.principles || []);
-  const boundaries = cleanStringList(payload?.local_extraction?.boundaries || []);
-  const tradeoffs = cleanStringList(payload?.local_extraction?.tradeoffs || []);
-
-  const summary = profile[0] || principles[0] || boundaries[0] || tradeoffs[0] || "Compiled worldview fragment.";
-  let justification = notes[0] || "";
-
-  if (!justification) {
-    const positives = payload.local_y_positive_signals || [];
-    const negatives = payload.local_y_negative_signals || [];
-    const xPole = payload?.axis_events?.x_pole_evidence?.[0];
-    const zPole = payload?.axis_events?.z_pole_evidence?.[0];
-    const parts = [];
-    if (xPole?.pole) parts.push(`x leans ${xPole.pole}`);
-    if (zPole?.pole) parts.push(`z leans ${zPole.pole}`);
-    if (positives.length) parts.push(`y support: ${positives[0].type || positives[0].signal_type}`);
-    if (negatives.length) parts.push(`risk: ${negatives[0].type || negatives[0].signal_type}`);
-    justification = parts.join(" | ");
-  }
-
-  return {
-    summary,
-    justification,
+    rawLLMOutput: state.latestCompile?.rawLLMOutput || "",
   };
 }
 
 function decorateProfileLine(line) {
   const wrapper = document.createElement("div");
   wrapper.className = "profile-entry-line";
-  const parts = String(line || "").split(/([+-](?:\d+(?:\.\d+)?|\.\d+))/g).filter(Boolean);
+  const parts = String(line || "")
+    .split(/([+-](?:\d+(?:\.\d+)?|\.\d+))/g)
+    .filter(Boolean);
   for (const part of parts) {
     if (/^[+-](?:\d+(?:\.\d+)?|\.\d+)$/.test(part)) {
       const span = document.createElement("span");
@@ -838,96 +822,152 @@ function decorateProfileLine(line) {
   return wrapper;
 }
 
-function canonicalTooltipKey(label = "") {
-  return String(label || "").trim().replace(/_/g, " ").replace(/\s+/g, " ");
+function prettyLabel(value = "") {
+  return String(value || "").replace(/^G\d_/, "").replace(/_/g, " ").trim();
 }
 
-function buildTooltipSpan(label, displayText = null) {
-  const span = document.createElement("span");
-  span.className = "note-label-with-tip";
-  span.textContent = displayText || label;
-  const tip = NOTE_TOOLTIP_MAP[canonicalTooltipKey(label)] || NOTE_TOOLTIP_MAP[canonicalTooltipKey(displayText || label)];
-  if (tip) {
-    span.title = tip;
-    span.dataset.tip = tip;
-  }
-  return span;
+function summarizeAxisLean(poleEvidence = [], integrationEvents = [], positivePole, negativePole, axisTag) {
+  const scoreFor = (pole) =>
+    (Array.isArray(poleEvidence) ? poleEvidence : [])
+      .filter((item) => String(item.pole || "").toLowerCase() === pole)
+      .reduce((sum, item) => {
+        const strength = { weak: 0.25, moderate: 0.5, strong: 0.85 }[String(item.strength || "moderate").toLowerCase()] || 0.5;
+        const confidence = Math.max(0, Math.min(1, Number(item.confidence ?? 1)));
+        return sum + strength * confidence;
+      }, 0);
+
+  const positive = scoreFor(positivePole);
+  const negative = scoreFor(negativePole);
+  const integration = (Array.isArray(integrationEvents) ? integrationEvents : []).length;
+  const delta = positive - negative;
+  if (positive <= 0 && negative <= 0 && integration <= 0) return null;
+  if (Math.abs(delta) < 0.08 && integration > 0) return `${axisTag} balanced`;
+  if (Math.abs(delta) < 0.08 && positive > 0 && negative > 0) return `${axisTag} balanced`;
+  return `${axisTag} leans ${delta >= 0 ? positivePole : negativePole}`;
 }
 
-function renderNoteLine(note) {
-  const div = document.createElement("div");
-  div.className = "profile-entry-note";
-  const text = String(note || "").trim();
-  if (!text) return div;
+function summarizeCompileEntry(payload = {}) {
+  const summary = cleanStringList(payload.profile || [])[0] || cleanStringList(payload?.local_extraction?.principles || [])[0] || "Compiled philosophy entry.";
+  const axisEvents = payload.axis_events || {};
+  const detailParts = [];
 
-  const gateMatch = text.match(/^(G\d_[^:]+):\s*(.+)$/);
-  if (gateMatch) {
-    div.appendChild(buildTooltipSpan(gateMatch[1], gateMatch[1].replace(/_/g, " ")));
-    div.appendChild(document.createTextNode(`: ${gateMatch[2]}`));
-    return div;
-  }
+  const xText = summarizeAxisLean(axisEvents.x_pole_evidence, axisEvents.x_integration_events, "empathy", "practicality", "x");
+  const zText = summarizeAxisLean(axisEvents.z_pole_evidence, axisEvents.z_integration_events, "wisdom", "knowledge", "z");
 
-  const riskMatch = text.match(/^risk:\s*([^|]+)\|\s*(.+)$/i);
-  if (riskMatch) {
-    div.appendChild(document.createTextNode("risk: "));
-    div.appendChild(buildTooltipSpan(riskMatch[1].trim(), riskMatch[1].trim()));
-    div.appendChild(document.createTextNode(` | ${riskMatch[2]}`));
-    return div;
-  }
+  if (xText) detailParts.push(xText);
+  if (zText) detailParts.push(zText);
 
-  div.textContent = text;
-  return div;
+  const positiveSignal = (payload.local_y_positive_signals || [])[0];
+  const negativeSignal = (payload.local_y_negative_signals || [])[0];
+  const positiveGate = (payload.triggered_gate_events || []).find((item) => item.direction === "positive");
+  const negativeGate = (payload.triggered_gate_events || []).find((item) => item.direction === "negative");
+
+  if (positiveSignal) detailParts.push(`y support: ${prettyLabel(positiveSignal.type || positiveSignal.signal_type)}`);
+  else if (positiveGate) detailParts.push(`y support: ${prettyLabel(positiveGate.gate)}`);
+
+  if (negativeSignal) detailParts.push(`risk: ${prettyLabel(negativeSignal.type || negativeSignal.signal_type)}`);
+  else if (negativeGate) detailParts.push(`risk: ${prettyLabel(negativeGate.gate)}`);
+
+  return { summary, detail: detailParts.join(" | ") };
 }
 
-function buildLatestNotes() {
-  const finalizedNotes = cleanStringList(state.latestCompile?.result?.finalized?.notes || []);
-  const gateStates = state.latestCompile?.result?.finalized?.data?.diagnostics?.gateStates || {};
-  const gateLines = Object.entries(gateStates)
-    .filter(([, value]) => value && value.status && value.status !== "dormant")
-    .map(([gate, value]) => `${gate}: ${value.status}`);
-  return [...finalizedNotes, ...gateLines];
+function noteDefinitionFromText(text = "") {
+  for (const [gate, definition] of Object.entries(GATE_DEFINITIONS)) {
+    if (text.includes(gate) || text.toLowerCase().includes(prettyLabel(gate))) return definition;
+  }
+  for (const [signal, definition] of Object.entries(SIGNAL_DEFINITIONS)) {
+    if (text.toLowerCase().includes(signal.replace(/_/g, " "))) return definition;
+    if (text.toLowerCase().includes(signal)) return definition;
+  }
+  return "";
+}
+
+function buildProfileNotes() {
+  const result = state.latestCompile?.result;
+  const payload = state.latestCompile?.payload || {};
+  const notes = [];
+
+  for (const signal of payload.local_y_negative_signals || []) {
+    notes.push({
+      text: `risk: ${prettyLabel(signal.type || signal.signal_type)} | ${signal.evidence_span || ""}`.trim(),
+      tooltip: SIGNAL_DEFINITIONS[String(signal.type || signal.signal_type || "").toLowerCase()] || "",
+    });
+  }
+
+  for (const event of payload.triggered_gate_events || []) {
+    notes.push({
+      text: `${event.gate} ${event.direction} | ${event.evidence_span || ""}`.trim(),
+      tooltip: GATE_DEFINITIONS[event.gate] || "",
+    });
+  }
+
+  const gateStates = result?.finalized?.data?.diagnostics?.gateStates || {};
+  for (const [gate, data] of Object.entries(gateStates)) {
+    if (!data || data.status === "dormant") continue;
+    notes.push({
+      text: `${gate}: ${data.status} | ${data.last_evidence_span || ""}`.trim(),
+      tooltip: GATE_DEFINITIONS[gate] || "",
+    });
+  }
+
+  for (const note of cleanStringList(result?.finalized?.notes || [])) {
+    notes.push({ text: note, tooltip: noteDefinitionFromText(note) });
+  }
+
+  const deduped = [];
+  const seen = new Set();
+  for (const note of notes) {
+    const key = canonKey(note.text);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(note);
+  }
+  return deduped;
 }
 
 function renderProfileEntries() {
   els.profileEntriesList.innerHTML = "";
   els.profileNotesList.innerHTML = "";
 
-  const historyEntries = state.compiledPayloads.map((payload) => summarizePayloadEntry(payload));
-  const latestNotes = buildLatestNotes();
+  const entries = state.compiledPayloads.map((payload) => summarizeCompileEntry(payload));
+  const notes = buildProfileNotes();
 
-  setListCount(els.profileEntriesCount, historyEntries.length, "entry");
-  setListCount(els.profileNotesCount, latestNotes.length, "note");
+  setListCount(els.profileEntriesCount, entries.length, "entry");
+  setListCount(els.profileNotesCount, notes.length, "note");
 
-  if (!historyEntries.length) {
+  if (!entries.length) {
     const li = document.createElement("li");
-    li.textContent = "No profile entry yet.";
+    li.textContent = "No compiled profile entry yet.";
     els.profileEntriesList.appendChild(li);
   } else {
-    historyEntries.forEach((entry) => {
+    entries.forEach((entry) => {
       const li = document.createElement("li");
-      const summary = document.createElement("div");
-      summary.className = "profile-entry-summary";
-      summary.textContent = entry.summary;
-      li.appendChild(summary);
-
-      if (entry.justification) {
-        const why = document.createElement("div");
-        why.className = "profile-entry-note";
-        why.textContent = entry.justification;
-        li.appendChild(why);
+      const summaryDiv = document.createElement("div");
+      summaryDiv.className = "profile-entry-summary";
+      summaryDiv.textContent = entry.summary;
+      li.appendChild(summaryDiv);
+      if (entry.detail) {
+        const detailDiv = document.createElement("div");
+        detailDiv.className = "profile-entry-note";
+        detailDiv.textContent = entry.detail;
+        li.appendChild(detailDiv);
       }
       els.profileEntriesList.appendChild(li);
     });
   }
 
-  if (!latestNotes.length) {
+  if (!notes.length) {
     const li = document.createElement("li");
     li.textContent = "No notes yet.";
     els.profileNotesList.appendChild(li);
   } else {
-    latestNotes.forEach((note) => {
+    notes.forEach((note) => {
       const li = document.createElement("li");
-      li.appendChild(renderNoteLine(note));
+      const div = document.createElement("div");
+      div.className = "profile-entry-note";
+      div.textContent = note.text;
+      if (note.tooltip) div.title = note.tooltip;
+      li.appendChild(div);
       els.profileNotesList.appendChild(li);
     });
   }
@@ -949,16 +989,12 @@ function applyToneClass(element, tone) {
   element.classList.add(`tone-${tone}`);
 }
 
-function renderAxisBar(fillEl, pointAxis, pointY) {
-  const y = EpistemicProfiler.clamp(Number(pointY) || 0, -1, 1);
-  const tone = getStabilityTone(y);
-  const spanWidth = Math.abs(y) * 100;
+function renderAxisBar(fillEl, axisPointValue, projectedYValue) {
+  const tone = getStabilityTone(projectedYValue);
+  const spanWidth = EpistemicProfiler.clamp(Math.abs(Number(projectedYValue) || 0), 0, 1) * 100;
   const slack = 100 - spanWidth;
-  const lateralBudget = Math.max(1 - Math.abs(y), 0);
-  const axisNormalized =
-    lateralBudget > 1e-9 ? EpistemicProfiler.clamp((Number(pointAxis) || 0) / lateralBudget, -1, 1) : 0;
-  const left = slack <= 0 ? 0 : ((axisNormalized + 1) / 2) * slack;
-
+  const axis = EpistemicProfiler.clamp(Number(axisPointValue) || 0, -1, 1);
+  const left = slack <= 0 ? 0 : ((axis + 1) / 2) * slack;
   applyToneClass(fillEl, tone);
   fillEl.style.width = `${spanWidth}%`;
   fillEl.style.left = `${left}%`;
@@ -985,7 +1021,6 @@ function buildMathDump(result) {
   const uiLike = params.uiLike || {};
   const diagnostics = finalizedData.diagnostics || {};
   const math = finalizedData.math || {};
-
   return [
     "semantic_params = {",
     `  a: ${formatSigned(semantics.a)},`,
@@ -1054,7 +1089,7 @@ function renderCompile() {
   renderMathPanel(result);
   renderProfileEntries();
 
-  if (!state.manualAvatar) {
+  if (!state.selectedAvatarId) {
     const picked = pickAvatarFromPoint(point);
     if (picked) {
       state.selectedAvatarId = picked.id;
@@ -1069,21 +1104,60 @@ function renderCompile() {
   postPointToVisualizer(result.finalized);
 }
 
+function compilePayload() {
+  const previousCompile = state.latestCompile;
+  const raw = sanitizeJSONInput(state.llmOutput);
+  if (!raw) throw new Error("Paste LLM output before compiling.");
+  if (previousCompile?.rawLLMOutput && previousCompile.rawLLMOutput === raw) {
+    throw new Error("That exact JSON has already been compiled.");
+  }
+
+  const { payload, canonFromText } = parseLLMOutput(raw);
+  const hadScorableSignals = payloadHasScorableSignals(payload);
+  if (!hadScorableSignals && !canonFromText.principles.items.length && !canonFromText.boundaries.items.length) {
+    throw new Error("LLM payload must contain usable evidence, structured signals, or canon suggestions.");
+  }
+
+  let result = previousCompile?.result || null;
+  let stabilityDelta = null;
+
+  if (hadScorableSignals) {
+    profiler.addLLMOutput(payload);
+    result = profiler.computePoint();
+    state.compiledPayloads.push(payload);
+
+    const previousY = Number(previousCompile?.result?.finalized?.data?.point?.y);
+    const nextY = Number(result?.finalized?.data?.point?.y);
+    stabilityDelta =
+      Number.isFinite(previousY) && Number.isFinite(nextY)
+        ? nextY - previousY
+        : null;
+
+    state.latestCompile = {
+      payload,
+      result,
+      stabilityDelta,
+      compiledAt: new Date().toISOString(),
+      rawLLMOutput: raw,
+    };
+  }
+
+  state.canon = applyCanonUpdate(state.canon, extractCanonFromPayload(payload));
+  state.canon = applyCanonUpdate(state.canon, { canon: canonFromText });
+
+  renderCanonLists();
+  renderPacketPreview();
+  renderCompile();
+  saveState();
+
+  return { didCompile: hadScorableSignals };
+}
+
 function exportProfile() {
   const blob = new Blob(
-    [
-      JSON.stringify(
-        {
-          exportedAt: new Date().toISOString(),
-          state: createExportableState(),
-        },
-        null,
-        2,
-      ),
-    ],
+    [JSON.stringify({ exportedAt: new Date().toISOString(), state: createExportableState() }, null, 2)],
     { type: "application/json" },
   );
-
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -1094,8 +1168,7 @@ function exportProfile() {
 
 async function importProfile(file) {
   if (!file) return;
-  const text = await file.text();
-  const parsed = JSON.parse(text);
+  const parsed = JSON.parse(await file.text());
   Object.assign(state, migrateState(parsed.state || parsed));
   rebuildFromCompiledPayloads();
   renderAll();
@@ -1119,74 +1192,11 @@ function renderAll() {
   renderCompile();
 }
 
-function compilePayload() {
-  const previousCompile = state.latestCompile;
-  const raw = sanitizeJSONInput(state.llmOutput);
-  if (!raw) throw new Error("Paste LLM output before compiling.");
-
-  const { payload } = parseLLMOutput(raw);
-  const payloadFingerprint = fingerprintPayload(payload);
-  if (payloadFingerprint && payloadFingerprint === previousCompile?.payloadFingerprint) {
-    return { duplicate: true, didCompile: false, didCanonUpdate: false };
-  }
-
-  const extractedCanon = extractCanonFromPayload(payload);
-  const hadScorableSignals = payloadHasScorableSignals(payload);
-  const hadCanonSignals =
-    extractedCanon.mode === "maintain" ||
-    (extractedCanon.canon?.principles?.length || 0) > 0 ||
-    (extractedCanon.canon?.boundaries?.length || 0) > 0;
-
-  let result = previousCompile?.result || null;
-  let stabilityDelta = null;
-
-  if (hadScorableSignals) {
-    profiler.addLLMOutput(payload);
-    result = profiler.computePoint();
-    state.compiledPayloads.push(payload);
-
-    const previousStability = Number(previousCompile?.result?.finalized?.data?.params?.uiLike?.stabilityPercent);
-    const nextStability = Number(result?.finalized?.data?.params?.uiLike?.stabilityPercent);
-    stabilityDelta =
-      Number.isFinite(previousStability) && Number.isFinite(nextStability)
-        ? nextStability - previousStability
-        : null;
-
-    state.latestCompile = {
-      payload,
-      payloadFingerprint,
-      result,
-      stabilityDelta,
-      compiledAt: new Date().toISOString(),
-    };
-  } else if (!hadCanonSignals) {
-    throw new Error(
-      "LLM payload must contain usable evidence, structured signals, compact profile signals, or canon optimization.",
-    );
-  }
-
-  state.canon = applyCanonUpdate(state.canon, extractedCanon);
-  const profileState = state.latestCompile?.result?.finalized?.data?.diagnostics?.profileState || {};
-  state.canon = canonicalizeCanonState({
-    principles: [...state.canon.principles, ...(profileState.core_principles || [])],
-    boundaries: [...state.canon.boundaries, ...(profileState.core_boundaries || [])],
-  });
-
-  renderCanonLists();
-  renderPacketPreview();
-  renderCompile();
-  saveState();
-
-  return {
-    duplicate: false,
-    didCompile: hadScorableSignals,
-    didCanonUpdate: hadCanonSignals,
-  };
-}
-
 function bind() {
-  attachDropBehavior(els.canonLists.principles, "principles");
-  attachDropBehavior(els.canonLists.boundaries, "boundaries");
+  for (const type of ["principles", "boundaries"]) {
+    attachDropBehavior(els.canonLists[type].items, type, "items");
+    attachDropBehavior(els.canonLists[type].suggested, type, "suggested");
+  }
 
   els.profileText.addEventListener("input", () => {
     state.profileText = els.profileText.value;
@@ -1251,16 +1261,8 @@ function bind() {
 
   els.compileBtn.addEventListener("click", () => {
     try {
-      const outcome = compilePayload();
-      if (outcome.duplicate) {
-        setCompileStatus("Same payload already compiled. Duplicate entry skipped.", "is-success");
-      } else if (outcome.didCompile && outcome.didCanonUpdate) {
-        setCompileStatus("Compiled aggregate and refreshed canon.", "is-success");
-      } else if (outcome.didCompile) {
-        setCompileStatus("Compiled aggregate and merged into profile.", "is-success");
-      } else {
-        setCompileStatus("Canon updated.", "is-success");
-      }
+      compilePayload();
+      setCompileStatus("Compiled aggregate and merged into profile.", "is-success");
     } catch (error) {
       setCompileStatus(error.message || "Compile failed.", "is-error");
     }
@@ -1270,7 +1272,8 @@ function bind() {
     const value = els.canonInput.value.trim();
     const type = els.canonType.value;
     if (!value) return;
-    state.canon[type] = canonicalizeCanonList([...(state.canon[type] || []), value]);
+    state.canon[type].items.push(createCanonItem(value));
+    sortCanonItems(type);
     els.canonInput.value = "";
     renderCanonLists();
     renderPacketPreview();
@@ -1320,9 +1323,7 @@ function bind() {
       els.avatarGrid.contains(target) ||
       els.toggleAvatarGridBtn.contains(target) ||
       els.selectedAvatarBtn.contains(target)
-    ) {
-      return;
-    }
+    ) return;
     state.avatarPickerOpen = false;
     renderAvatars();
     saveState();

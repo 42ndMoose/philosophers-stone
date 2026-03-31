@@ -22,21 +22,14 @@
       <main class="workspace-grid">
         <section class="panel panel-main">
           <div class="panel-head panel-head-tight">
-            <div>
-              <h2>System input</h2>
-            </div>
+            <div><h2>System input</h2></div>
             <div class="toolbar-row wrap-row">
               <button id="copyPacketBtn" class="primary-btn button-compact">Copy LLM packet</button>
               <button id="togglePacketPreviewBtn" class="ghost-btn button-compact" aria-expanded="false">Show hidden packet</button>
             </div>
           </div>
 
-          <textarea
-            id="profileText"
-            class="discord-box"
-            rows="1"
-            placeholder="Write or paste the worldview, philosophy, or raw profile text here."
-          ></textarea>
+          <textarea id="profileText" class="discord-box" rows="1" placeholder="Write or paste the worldview, philosophy, or raw profile text here."></textarea>
 
           <div id="packetPreviewWrap" class="packet-preview hidden">
             <div class="packet-toolbar">
@@ -49,21 +42,14 @@
           <div class="split-section">
             <div>
               <div class="section-title">Paste LLM output</div>
-              <p class="section-sub">
-                Paste the interpreter output, then compile it through the profiler.
-              </p>
+              <p class="section-sub">Paste the interpreter output, then compile it through the profiler.</p>
             </div>
             <div class="toolbar-row wrap-row">
               <button id="pasteLlmOutputBtn" class="ghost-btn">Paste</button>
               <button id="compileBtn" class="primary-btn">Compile to profile</button>
             </div>
           </div>
-          <input
-            id="llmOutput"
-            class="code-box llm-inline-input"
-            spellcheck="false"
-            placeholder='{"model":"epistemic_octahedron_interpreter_v1","evidence":[]}'
-          />
+          <input id="llmOutput" class="code-box llm-inline-input" spellcheck="false" placeholder='{"model":"epistemic_octahedron_interpreter_v1","evidence":[]}' />
 
           <div id="compileStatus" class="status-line" aria-live="polite"></div>
         </section>
@@ -83,47 +69,17 @@
 
           <div class="profile-head-row">
             <div class="avatar-current-wrap">
-              <button
-                id="selectedAvatarBtn"
-                class="avatar-btn avatar-btn-current"
-                type="button"
-                aria-label="Current profile picture"
-              ></button>
-              <button
-                id="toggleAvatarGridBtn"
-                class="avatar-edit-btn"
-                type="button"
-                aria-label="Edit profile picture"
-                aria-expanded="false"
-              >
-                ✎
-              </button>
-              <div
-                id="avatarGrid"
-                class="avatar-grid avatar-popup hidden"
-                role="dialog"
-                aria-label="Choose profile picture"
-              ></div>
+              <button id="selectedAvatarBtn" class="avatar-btn avatar-btn-current" type="button" aria-label="Current profile picture"></button>
+              <button id="toggleAvatarGridBtn" class="avatar-edit-btn" type="button" aria-label="Edit profile picture" aria-expanded="false">✎</button>
+              <div id="avatarGrid" class="avatar-grid avatar-popup hidden" role="dialog" aria-label="Choose profile picture"></div>
             </div>
 
-            <div
-              id="profileName"
-              class="profile-name-display"
-              contenteditable="true"
-              role="textbox"
-              aria-label="Profile name"
-              spellcheck="false"
-              data-placeholder="Profile Name"
-            ></div>
+            <div id="profileName" class="profile-name-display" contenteditable="true" role="textbox" aria-label="Profile name" spellcheck="false" data-placeholder="Profile Name"></div>
           </div>
 
           <div class="field-grid profile-meta-row">
             <label>
-              <input
-                id="profileAdditionalInfo"
-                type="text"
-                placeholder="Additional info eg. age, gender, persona"
-              />
+              <input id="profileAdditionalInfo" type="text" placeholder="Additional info eg. age, gender, persona" />
             </label>
           </div>
 
@@ -219,12 +175,26 @@
 
             <div class="canon-group">
               <div class="mini-head">Principles</div>
-              <ul id="principlesList" class="canon-list"></ul>
+              <section class="canon-subsection">
+                <div class="mini-head mini-head-sub">Current</div>
+                <ul id="principlesList" class="canon-list"></ul>
+              </section>
+              <section class="canon-subsection">
+                <div class="mini-head mini-head-sub">Suggested optimization</div>
+                <ul id="principlesSuggestedList" class="canon-list canon-list-suggested"></ul>
+              </section>
             </div>
 
             <div class="canon-group">
               <div class="mini-head">Boundaries</div>
-              <ul id="boundariesList" class="canon-list"></ul>
+              <section class="canon-subsection">
+                <div class="mini-head mini-head-sub">Current</div>
+                <ul id="boundariesList" class="canon-list"></ul>
+              </section>
+              <section class="canon-subsection">
+                <div class="mini-head mini-head-sub">Suggested optimization</div>
+                <ul id="boundariesSuggestedList" class="canon-list canon-list-suggested"></ul>
+              </section>
             </div>
           </div>
 
@@ -237,17 +207,10 @@
       <section class="results-grid">
         <div class="panel visualizer-panel">
           <div class="panel-head panel-head-tight">
-            <div>
-              <h2>Visualizer</h2>
-            </div>
+            <div><h2>Visualizer</h2></div>
             <button id="refreshVisualizerBtn" class="ghost-btn">Apply</button>
           </div>
-          <iframe
-            id="visualizerFrame"
-            class="visualizer-frame"
-            src="./visualizer.html"
-            title="Epistemic Octahedron Visualizer"
-          ></iframe>
+          <iframe id="visualizerFrame" class="visualizer-frame" src="./visualizer.html" title="Epistemic Octahedron Visualizer"></iframe>
         </div>
       </section>
     </div>
