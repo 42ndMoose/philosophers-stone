@@ -14,16 +14,8 @@
           <h1>Philosopher's Stone</h1>
         </div>
         <div class="topbar-actions">
-          <a
-            class="ghost-link"
-            href="./visualizer.html"
-            target="_blank"
-            rel="noreferrer"
-            >Open visualizer only</a
-          >
-          <button id="resetWorkspaceBtn" class="ghost-btn">
-            Reset workspace
-          </button>
+          <a class="ghost-link" href="./visualizer.html" target="_blank" rel="noreferrer">Open visualizer only</a>
+          <button id="resetWorkspaceBtn" class="ghost-btn">Reset workspace</button>
         </div>
       </header>
 
@@ -34,16 +26,8 @@
               <h2>System input</h2>
             </div>
             <div class="toolbar-row wrap-row">
-              <button id="copyPacketBtn" class="primary-btn button-compact">
-                Copy LLM packet
-              </button>
-              <button
-                id="togglePacketPreviewBtn"
-                class="ghost-btn button-compact"
-                aria-expanded="false"
-              >
-                Show hidden packet
-              </button>
+              <button id="copyPacketBtn" class="primary-btn button-compact">Copy LLM packet</button>
+              <button id="togglePacketPreviewBtn" class="ghost-btn button-compact" aria-expanded="false">Show hidden packet</button>
             </div>
           </div>
 
@@ -57,12 +41,7 @@
           <div id="packetPreviewWrap" class="packet-preview hidden">
             <div class="packet-toolbar">
               <span>Generated LLM packet preview</span>
-              <button
-                id="refreshPacketBtn"
-                class="ghost-btn button-compact button-small"
-              >
-                Refresh
-              </button>
+              <button id="refreshPacketBtn" class="ghost-btn button-compact button-small">Refresh</button>
             </div>
             <pre id="packetPreview" class="packet-preview-box"></pre>
           </div>
@@ -71,15 +50,12 @@
             <div>
               <div class="section-title">Paste LLM output</div>
               <p class="section-sub">
-                Paste the interpreter output, then compile it through the
-                profiler.
+                Paste the interpreter output, then compile it through the profiler.
               </p>
             </div>
             <div class="toolbar-row wrap-row">
               <button id="pasteLlmOutputBtn" class="ghost-btn">Paste</button>
-              <button id="compileBtn" class="primary-btn">
-                Compile to profile
-              </button>
+              <button id="compileBtn" class="primary-btn">Compile to profile</button>
             </div>
           </div>
           <input
@@ -96,23 +72,12 @@
           <div class="panel-head stacked-gap">
             <div>
               <h2>Profile</h2>
-              <p>
-                Choose an avatar or let the profiler pick one after compile.
-              </p>
+              <p>Choose an avatar or let the profiler pick one after compile.</p>
             </div>
             <div class="toolbar-row wrap-row">
-              <button id="exportProfileBtn" class="ghost-btn">
-                Export profile
-              </button>
-              <button id="importProfileBtn" class="ghost-btn">
-                Import profile
-              </button>
-              <input
-                id="importProfileInput"
-                type="file"
-                accept="application/json"
-                hidden
-              />
+              <button id="exportProfileBtn" class="ghost-btn">Export profile</button>
+              <button id="importProfileBtn" class="ghost-btn">Import profile</button>
+              <input id="importProfileInput" type="file" accept="application/json" hidden />
             </div>
           </div>
 
@@ -215,13 +180,7 @@
               </div>
 
               <div class="stats-actions toolbar-row wrap-row">
-                <button
-                  id="toggleMathBtn"
-                  class="ghost-btn button-small"
-                  aria-expanded="false"
-                >
-                  Show math
-                </button>
+                <button id="toggleMathBtn" class="ghost-btn button-small" aria-expanded="false">Show math</button>
               </div>
 
               <div id="mathWrap" class="math-wrap hidden">
@@ -250,94 +209,27 @@
 
           <div class="canon-wrap">
             <div class="add-row wrap-row canon-add-row">
-              <input
-                id="canonInput"
-                type="text"
-                placeholder="Add a principle or boundary"
-              />
+              <input id="canonInput" type="text" placeholder="Add a principle or boundary" />
               <select id="canonType">
                 <option value="principles">Principle</option>
                 <option value="boundaries">Boundary</option>
-              </select>
-              <select id="canonLayer">
-                <option value="core">Core</option>
-                <option value="supporting">Supporting</option>
-                <option value="conditional">Conditional</option>
               </select>
               <button id="addCanonBtn" class="ghost-btn">Add</button>
             </div>
 
             <div class="canon-group">
               <div class="mini-head">Principles</div>
-              <div class="canon-columns three-up">
-                <section>
-                  <div class="mini-head">Core</div>
-                  <ul
-                    id="principlesList-core"
-                    class="canon-list"
-                    data-list-type="principles"
-                    data-layer-key="core"
-                  ></ul>
-                </section>
-                <section>
-                  <div class="mini-head">Supporting</div>
-                  <ul
-                    id="principlesList-supporting"
-                    class="canon-list"
-                    data-list-type="principles"
-                    data-layer-key="supporting"
-                  ></ul>
-                </section>
-                <section>
-                  <div class="mini-head">Conditional</div>
-                  <ul
-                    id="principlesList-conditional"
-                    class="canon-list"
-                    data-list-type="principles"
-                    data-layer-key="conditional"
-                  ></ul>
-                </section>
-              </div>
+              <ul id="principlesList" class="canon-list"></ul>
             </div>
 
             <div class="canon-group">
               <div class="mini-head">Boundaries</div>
-              <div class="canon-columns three-up">
-                <section>
-                  <div class="mini-head">Core</div>
-                  <ul
-                    id="boundariesList-core"
-                    class="canon-list"
-                    data-list-type="boundaries"
-                    data-layer-key="core"
-                  ></ul>
-                </section>
-                <section>
-                  <div class="mini-head">Supporting</div>
-                  <ul
-                    id="boundariesList-supporting"
-                    class="canon-list"
-                    data-list-type="boundaries"
-                    data-layer-key="supporting"
-                  ></ul>
-                </section>
-                <section>
-                  <div class="mini-head">Conditional</div>
-                  <ul
-                    id="boundariesList-conditional"
-                    class="canon-list"
-                    data-list-type="boundaries"
-                    data-layer-key="conditional"
-                  ></ul>
-                </section>
-              </div>
+              <ul id="boundariesList" class="canon-list"></ul>
             </div>
           </div>
 
           <div class="toolbar-row wrap-row footer-actions">
-            <button id="copyProfilerAssessmentBtn" class="ghost-btn">
-              Copy profiler assessment
-            </button>
+            <button id="copyProfilerAssessmentBtn" class="ghost-btn">Copy profiler assessment</button>
           </div>
         </aside>
       </main>
