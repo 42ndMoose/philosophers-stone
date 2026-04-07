@@ -40,7 +40,7 @@ function formatProfilerMemorySection(memory = {}) {
 }
 
 const CORE_CONTRACT = `EPISTEMIC OCTAHEDRON INTERPRETER CONTRACT
-version: 6.0
+version: 6.1
 
 PURPOSE
 The LLM is an extractor and canon optimizer only.
@@ -118,14 +118,7 @@ Bucket meanings:
 - y_positive = support for coherence, self-correction, counter-consideration, reality contact, or non-self-sealing stability
 - y_negative = support for false certainty, contradiction evasion, reality detachment, dogmatic closure, self-sealing, or collapse markers
 
-Integration rules:
-- x_integration should rise only when the text shows real handling of the empathy/practicality tension
-- z_integration should rise only when the text shows real handling of the wisdom/knowledge tension
-- mere coexistence, civility, harmony, or pluralism language may justify a weak signal, but not strong integration by itself
-- integration is not a substitute for the poles; if integration is above 0, the relevant pole buckets should usually also be above 0 when the text gives any reason for that
-- acknowledging two sides is weaker than integrating them
-
-EXTRACTION RULES
+EXTRACTION DISCIPLINE
 1. Extract portable philosophical structure, not final verdicts.
 2. Prefer under-calling over over-calling.
 3. Use evidence spans whenever possible.
@@ -136,6 +129,13 @@ EXTRACTION RULES
 8. Use canon memory as context, not as something to parrot back.
 9. If evidence is too thin for a gate event, leave the gate empty and keep the support in semantic_grid or local signals instead.
 10. Do not infer rich structure from generic low-depth wording.
+11. Pole buckets are strict. Populate empathy, practicality, wisdom, or knowledge only when the text itself directly indicates that axis meaning.
+12. Generic coexistence, pluralism, civility, harmony, unity, or balance language does not by itself populate empathy, practicality, wisdom, or knowledge.
+13. A bare coexistence claim may justify a weak x_integration signal and a weak y_positive signal when the text supports compatibility across opposition.
+14. Do not populate z_integration unless the text actually shows handling of the wisdom/knowledge tension.
+15. Do not infer y_negative unless the text itself gives negative epistemic evidence.
+16. Do not trigger G2_non_strawman from a bare coexistence claim unless the text actually characterizes another view fairly enough to show contact with it.
+17. Acknowledging two sides is weaker than integrating them.
 
 SCOPE CLASSIFICATION
 Always classify the input as one of:
