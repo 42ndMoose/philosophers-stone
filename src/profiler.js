@@ -216,7 +216,8 @@ export class EpistemicProfiler {
       },
       integrationSaturation: 1.0,
       integrationBonusWeight: 0.7,
-      unresolvedAsymmetryPenaltyWeight: 0.55,
+      unresolvedAsymmetryPenaltyWeight: 0.45,
+      unresolvedAsymmetryDeadzone: 0.08,
       positiveGateInfluence: 0.16,
       negativeGateInfluence: 0.28,
       contradictionPenaltyScale: 1.0,
@@ -975,8 +976,12 @@ export class EpistemicProfiler {
     const negativeSum = Number(supportSummary.totals.y_negative) || 0;
     const integrationBonus =
       this.config.integrationBonusWeight * (xSummary.resolvedBalance + zSummary.resolvedBalance);
+
+    const asymmetryDeadzone = Number(this.config.unresolvedAsymmetryDeadzone ?? 0);
+    const xPenaltyBase = Math.max(0, (Number(xSummary.unresolvedAsymmetry) || 0) - asymmetryDeadzone);
+    const zPenaltyBase = Math.max(0, (Number(zSummary.unresolvedAsymmetry) || 0) - asymmetryDeadzone);
     const unresolvedAsymmetryPenalty =
-      this.config.unresolvedAsymmetryPenaltyWeight * (xSummary.unresolvedAsymmetry + zSummary.unresolvedAsymmetry);
+      this.config.unresolvedAsymmetryPenaltyWeight * (xPenaltyBase + zPenaltyBase);
 
     let contradictionPenalty = 0;
     for (const entry of this.state.entries) {
@@ -1033,6 +1038,9 @@ export class EpistemicProfiler {
       contradictionPenalty,
       integrationBonus,
       unresolvedAsymmetryPenalty,
+      asymmetryDeadzone,
+      xPenaltyBase,
+      zPenaltyBase,
       persistent_gate_bonus,
       persistent_gate_penalty,
       weightedMeanPositiveGateScores,
@@ -1061,7 +1069,7 @@ export class EpistemicProfiler {
     const yCoverage = epistemicStability.y_coverage;
 
     return {
-      model: "epistemic_octahedron_profiler_v7",
+      model: "epistemic_octahedron_profiler_v7_1",
       semantics: { a, b, s, yEstimate: s, yCoverage },
       uiLike: {
         empathyPercent: (a + 1) * 50,
