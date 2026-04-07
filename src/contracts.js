@@ -40,102 +40,48 @@ function formatProfilerMemorySection(memory = {}) {
 }
 
 const CORE_CONTRACT = `EPISTEMIC OCTAHEDRON INTERPRETER CONTRACT
-version: 6.1
+version: 5.4
 
 PURPOSE
 The LLM is an extractor and canon optimizer only.
 It does not compute final scores, maturity percentages, or final x y z coordinates.
-The profiler later converts semantic values into the octahedron surface where |x| + |y| + |z| = 1.
 
-CONTEXT DISCIPLINE
+CONTEXT
 Use only the text inside this packet.
 Do not browse the web.
 Do not call tools.
-Do not import outside facts or context.
-If the input mentions named entities, politics, history, science, or current events, extract only what the user text itself supports.
+Do not use outside facts or outside context.
+Extract only what the given text itself supports.
 
 AXIS DEFINITIONS
-- x negative = practicality
-- x positive = empathy
-- z negative = knowledge
-- z positive = wisdom
-- y negative = negative epistemic stability
-- y positive = positive epistemic stability
+x negative = practicality
+x positive = empathy
+z negative = knowledge
+z positive = wisdom
+y negative = negative epistemic stability
+y positive = positive epistemic stability
 
 Operational meanings:
-- empathy / practicality = orientation toward persons versus functional demands
-- wisdom / knowledge = orientation toward deep judgment versus information, accumulation, or technical grasp
-- epistemic stability = coherence, reality-tracking, self-correction, and resistance to delusion under reflection or pressure
+- Empathy / Practicality = persons versus functional demands
+- Wisdom / Knowledge = deep judgment versus information or technical grasp
+- Epistemic stability = coherence, reality-tracking, self-correction, and resistance to delusion
 
-Model distinctions:
-- the upper vertex is objective peak philosophical maturity
-- the lower vertex is epistemic collapse
-- the origin is a pre-philosophical null state
-- non-asymmetry by absence is not the same as non-asymmetry by reflective integration
-
-INTERPRETIVE ROLE
-Your job is to fill a dense evidence grid.
-You are not deciding the final plot.
-You are not choosing the final dominant aspect.
-You are not awarding maturity.
-You are reporting how much support the text gives to each bucket.
-
-PRIMARY PROFILER GRID
-Always return profiler_mode = "dense_support_v1".
-Always return semantic_grid.
-The semantic_grid is primary for the profiler.
-The other human-readable fields should remain consistent with it.
-
-Grid buckets:
-- empathy
-- practicality
-- wisdom
-- knowledge
-- x_integration
-- z_integration
-- y_positive
-- y_negative
-
-For every semantic_grid bucket, return:
-- support from 0.0 to 1.0
-- confidence from 0.0 to 1.0
-- evidence_spans as an array of short text spans, which may be empty
-
-Interpretation rules for the grid:
-- support = how much the text itself supports that bucket
-- confidence = how sure you are that the extraction is correct
-- no evidence means support 0.0 and an empty evidence_spans array
-- wording nuance belongs in this extraction layer, not in later calculator heuristics
-- be conservative with short or slogan-like inputs
-
-Bucket meanings:
-- empathy = support for person-centered concern, care, mercy, humane regard, or relational priority
-- practicality = support for function, feasibility, consequence, logistics, viability, survival, or operational demands
-- wisdom = support for judgment, proportion, synthesis, mature framing, or wider orientation
-- knowledge = support for information, fact-accumulation, technical grasp, literal precision, or observational detail
-- x_integration = support that empathy and practicality are being handled together rather than merely one-sided
-- z_integration = support that wisdom and knowledge are being handled together rather than merely one-sided
-- y_positive = support for coherence, self-correction, counter-consideration, reality contact, or non-self-sealing stability
-- y_negative = support for false certainty, contradiction evasion, reality detachment, dogmatic closure, self-sealing, or collapse markers
-
-EXTRACTION DISCIPLINE
+INTERPRETIVE RULES
 1. Extract portable philosophical structure, not final verdicts.
 2. Prefer under-calling over over-calling.
-3. Use evidence spans whenever possible.
+3. Use evidence_span whenever possible.
 4. Only emit triggered gate events when the text gives actual evidence for or against a gate.
 5. Silence is neutral. Do not emit gate failures by absence.
 6. Do not compute the final plot.
 7. Do not let display labels or prior canon wording bias extraction.
 8. Use canon memory as context, not as something to parrot back.
-9. If evidence is too thin for a gate event, leave the gate empty and keep the support in semantic_grid or local signals instead.
-10. Do not infer rich structure from generic low-depth wording.
-11. Pole buckets are strict. Populate empathy, practicality, wisdom, or knowledge only when the text itself directly indicates that axis meaning.
-12. Generic coexistence, pluralism, civility, harmony, unity, or balance language does not by itself populate empathy, practicality, wisdom, or knowledge.
-13. A bare coexistence claim may justify a weak x_integration signal and a weak y_positive signal when the text supports compatibility across opposition.
-14. Do not populate z_integration unless the text actually shows handling of the wisdom/knowledge tension.
-15. Do not infer y_negative unless the text itself gives negative epistemic evidence.
-16. Do not trigger G2_non_strawman from a bare coexistence claim unless the text actually characterizes another view fairly enough to show contact with it.
-17. Acknowledging two sides is weaker than integrating them.
+9. The profiler should receive a full dense grid every time. Fill every semantic_grid field.
+10. Default unsupported fields to support = 0, confidence = 0, evidence_spans = [].
+11. Generic coexistence, pluralism, civility, harmony, or unity language may weakly support x_integration and y_positive.
+12. Generic coexistence, pluralism, civility, harmony, or unity language does not by itself support empathy, practicality, wisdom, or knowledge.
+13. Do not populate a pole bucket unless the text directly supports that axis meaning.
+14. A bare coexistence claim does not by itself justify G2_non_strawman.
+15. Low-depth or slogan-like input should stay weak and sparse.
 
 SCOPE CLASSIFICATION
 Always classify the input as one of:
@@ -156,6 +102,26 @@ You may emit one or more of:
 - rhetorical_generalization
 - norm
 - self_description
+
+SEMANTIC GRID
+Always return this full grid:
+- empathy
+- practicality
+- wisdom
+- knowledge
+- x_integration
+- z_integration
+- y_positive
+- y_negative
+
+For every semantic_grid bucket include:
+- support from 0.0 to 1.0
+- confidence from 0.0 to 1.0
+- evidence_spans as an array of strings
+
+Meaning of the integration buckets:
+- x_integration = evidence that empathy and practicality are being held together or reconciled
+- z_integration = evidence that wisdom and knowledge are being held together or reconciled
 
 LOCAL EXTRACTION
 local_extraction may include:
@@ -181,6 +147,9 @@ For every pole evidence item, include:
 - strength = weak | moderate | strong
 - confidence from 0.5 to 1.0
 - evidence_span
+
+If one pole is primary and the other is only acknowledged or counterweighted, do not give them equal default emphasis.
+Acknowledging the opposite pole is not the same as weighting it equally.
 
 LOCAL Y SIGNALS
 Each local y signal should include:
@@ -375,7 +344,7 @@ function formatComputedSection(computed = {}) {
   const lines = [
     "Computed profiler values",
     "These percentages are derived directly from the plotted point.",
-    "Lateral percentages are stability-percent dependent because higher |Y| compresses lateral movement on the surface.",
+    "Lateral percentages are stability-percent dependent when the point is on the octahedron surface.",
     `Empathy percentage: ${formatPercent(empathy)}`,
     `Practicality percentage: ${formatPercent(practicality)}`,
     `Wisdom percentage: ${formatPercent(wisdom)}`,
