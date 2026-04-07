@@ -1,3 +1,4 @@
+
 const DEFAULT_GATE_WEIGHTS = {
   G1_counter_consideration: 0.8,
   G2_non_strawman: 1.0,
@@ -12,6 +13,12 @@ const DEFAULT_SCOPE_WEIGHTS = {
   stance: 0.6,
   worldview_fragment: 0.8,
   full_profile_import: 1.0,
+};
+
+const DEFAULT_SCOPE_STRENGTH_WEIGHTS = {
+  low: 0.75,
+  medium: 0.9,
+  high: 1.0,
 };
 
 const DEFAULT_STRENGTH_WEIGHTS = {
@@ -44,63 +51,6 @@ const DEFAULT_SIGNAL_TYPES = {
   ]),
 };
 
-const DEFAULT_LOCAL_Y_SIGNAL_WEIGHTS = {
-  positive: {
-    counter_consideration: 1.15,
-    self_correction: 1.25,
-    reality_contact: 1.25,
-    coherence: 1.1,
-    error_awareness: 1.15,
-    revision_openness: 1.2,
-    non_strawman_fairness: 1.0,
-    legacy_positive: 1.0,
-  },
-  negative: {
-    false_certainty: 0.5,
-    self_sealing: 1.3,
-    contradiction_evasion: 1.2,
-    reality_detachment: 1.2,
-    dogmatic_closure: 0.95,
-    collapse_marker: 1.4,
-    strawman_dependence: 0.4,
-    broad_motive_attribution: 0.25,
-    legacy_negative: 1.0,
-  },
-};
-
-const DEFAULT_SOFT_NEGATIVE_SIGNAL_TYPES = new Set([
-  "false_certainty",
-  "dogmatic_closure",
-  "strawman_dependence",
-  "broad_motive_attribution",
-  "legacy_negative",
-]);
-
-const DEFAULT_GATE_TO_LOCAL_SIGNAL_MAP = {
-  positive: {
-    G1_counter_consideration: "counter_consideration",
-    G2_non_strawman: "non_strawman_fairness",
-    G3_self_correction: "self_correction",
-    G4_contradiction_handling: "coherence",
-    G5_reality_contact: "reality_contact",
-    G6_non_self_sealing: "revision_openness",
-  },
-  negative: {
-    G1_counter_consideration: "dogmatic_closure",
-    G2_non_strawman: "strawman_dependence",
-    G3_self_correction: "false_certainty",
-    G4_contradiction_handling: "contradiction_evasion",
-    G5_reality_contact: "reality_detachment",
-    G6_non_self_sealing: "self_sealing",
-  },
-};
-
-const AXIS_LABELS = {
-  empathyPracticality: { positive: "empathy", negative: "practicality" },
-  wisdomKnowledge: { positive: "wisdom", negative: "knowledge" },
-  epistemicStability: { positive: "stability", negative: "instability" },
-};
-
 const DEFAULT_EMPTY_PROFILE_STATE = () => ({
   core_principles: [],
   core_boundaries: [],
@@ -108,81 +58,22 @@ const DEFAULT_EMPTY_PROFILE_STATE = () => ({
   risk_notes: [],
 });
 
-
-const DEFAULT_AXIS_TIE_BREAK_INFLUENCE = 0.35;
-
-const AXIS_TIE_BREAK_KEYWORDS = {
-  empathyPracticality: {
-    positive: [
-      ["empathy", 2.0],
-      ["compassion", 1.8],
-      ["kindness", 1.4],
-      ["comfort", 1.2],
-      ["feelings", 1.1],
-      ["relational", 1.1],
-      ["care", 1.0],
-      ["mercy", 1.2],
-      ["humane", 1.2],
-      ["fairness", 0.8],
-      ["bullied", 1.0],
-      ["harm", 0.8],
-      ["protect", 0.6],
-    ],
-    negative: [
-      ["practical", 1.8],
-      ["practicality", 2.0],
-      ["health", 1.7],
-      ["health failure", 2.0],
-      ["outcome", 1.2],
-      ["outcomes", 1.2],
-      ["feasible", 1.1],
-      ["feasibility", 1.3],
-      ["logistics", 1.2],
-      ["consequence", 1.3],
-      ["consequences", 1.3],
-      ["long-term", 1.3],
-      ["utility", 1.1],
-      ["viability", 1.4],
-      ["survival", 1.5],
-      ["reality", 1.0],
-      ["teachable", 0.9],
-      ["criticism", 0.7],
-    ],
-  },
-  wisdomKnowledge: {
-    positive: [
-      ["wisdom", 2.0],
-      ["synthesis", 1.7],
-      ["proportion", 1.4],
-      ["context", 1.2],
-      ["judgment", 1.3],
-      ["insight", 1.2],
-      ["broader", 1.0],
-      ["all things considered", 1.8],
-      ["coexist", 1.1],
-      ["dialogue", 0.9],
-      ["mature", 0.9],
-      ["integrated", 1.2],
-      ["collective conscience", 1.0],
-      ["conscience", 0.7],
-    ],
-    negative: [
-      ["knowledge", 2.0],
-      ["literal", 1.2],
-      ["observation", 1.1],
-      ["facts", 1.2],
-      ["fact", 1.2],
-      ["data", 1.1],
-      ["precision", 1.0],
-      ["technical", 1.1],
-      ["information", 1.2],
-      ["pattern", 1.0],
-      ["patterns", 1.0],
-      ["detail", 0.9],
-      ["details", 0.9],
-    ],
-  },
+const AXIS_LABELS = {
+  empathyPracticality: { positive: "empathy", negative: "practicality" },
+  wisdomKnowledge: { positive: "wisdom", negative: "knowledge" },
+  epistemicStability: { positive: "stability", negative: "instability" },
 };
+
+const GRID_KEYS = [
+  "empathy",
+  "practicality",
+  "wisdom",
+  "knowledge",
+  "x_integration",
+  "z_integration",
+  "y_positive",
+  "y_negative",
+];
 
 function cloneJSON(value) {
   return JSON.parse(JSON.stringify(value));
@@ -210,36 +101,6 @@ function cleanStringList(items = []) {
       return "";
     })
     .filter(Boolean);
-}
-
-function escapeRegex(text) {
-  return String(text || "").replace(/[-\/\^$*+?.()|[\]{}]/g, "\\$&");
-}
-
-function keywordWeightFromText(value, weightedTerms = []) {
-  const hay = ` ${String(value || "").toLowerCase()} `;
-  let total = 0;
-  for (const [term, weight] of weightedTerms) {
-    const pattern = new RegExp(`\\b${escapeRegex(term)}\\b`, "g");
-    const matches = hay.match(pattern);
-    if (matches?.length) total += matches.length * Number(weight || 0);
-  }
-  return total;
-}
-
-function collectTextSnippets(value) {
-  if (typeof value === "string") return [value];
-  if (!value || typeof value !== "object") return [];
-  const out = [];
-  for (const key of ["normalized", "evidence_span", "claim_a", "claim_b", "reason", "note"]) {
-    if (typeof value[key] === "string" && value[key].trim()) out.push(value[key]);
-  }
-  if (Array.isArray(value.evidence_spans)) {
-    for (const item of value.evidence_spans) {
-      if (typeof item === "string" && item.trim()) out.push(item);
-    }
-  }
-  return out;
 }
 
 function dedupeLatestFirst(items = []) {
@@ -279,10 +140,66 @@ function normalizeEvidenceSpan(value) {
   return cleanString(value);
 }
 
-function pickNormalizedText(item) {
-  return cleanString(
-    item?.normalized || item?.text || item?.value || item?.note || item?.reason || item,
+function compactEvidenceSpans(values = [], limit = 4) {
+  const clean = dedupeLatestFirst(
+    (Array.isArray(values) ? values : [values])
+      .flatMap((item) => (Array.isArray(item) ? item : [item]))
+      .map((item) => normalizeEvidenceSpan(item))
+      .filter(Boolean),
   );
+  return clean.slice(0, limit);
+}
+
+function normalizeGridBucket(input) {
+  const raw = input && typeof input === "object" && !Array.isArray(input)
+    ? input
+    : typeof input === "number"
+      ? { support: input }
+      : {};
+
+  const support = Number(
+    raw.support ?? raw.value ?? raw.score ?? raw.magnitude ?? raw.weight ?? 0,
+  );
+  const confidence = Number(raw.confidence ?? raw.certainty ?? (support > 0 ? 1 : 0));
+  const evidence_spans = compactEvidenceSpans(
+    raw.evidence_spans || raw.evidenceSpans || raw.spans || raw.evidence_span || raw.reason,
+  );
+
+  return {
+    support: EpistemicProfiler.clamp(Number.isFinite(support) ? support : 0, 0, 1),
+    confidence: EpistemicProfiler.clamp(Number.isFinite(confidence) ? confidence : 0, 0, 1),
+    evidence_spans,
+  };
+}
+
+function hasGridBucketValue(value) {
+  if (value === undefined || value === null) return false;
+  if (typeof value === "number") return true;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value !== "object") return false;
+  return ["support", "value", "score", "magnitude", "weight", "confidence", "evidence_spans", "evidenceSpans", "spans", "evidence_span", "reason"].some(
+    (key) => value[key] !== undefined,
+  );
+}
+
+function emptySemanticGrid() {
+  return Object.fromEntries(
+    GRID_KEYS.map((key) => [key, { support: 0, confidence: 0, evidence_spans: [] }]),
+  );
+}
+
+function bucketAliases(key) {
+  const aliases = {
+    empathy: ["empathy"],
+    practicality: ["practicality"],
+    wisdom: ["wisdom"],
+    knowledge: ["knowledge"],
+    x_integration: ["x_integration", "xIntegration", "x_balance", "xBalance"],
+    z_integration: ["z_integration", "zIntegration", "z_balance", "zBalance"],
+    y_positive: ["y_positive", "yPositive", "positive_y", "positiveY"],
+    y_negative: ["y_negative", "yNegative", "negative_y", "negativeY"],
+  };
+  return aliases[key] || [key];
 }
 
 export class EpistemicProfiler {
@@ -290,23 +207,19 @@ export class EpistemicProfiler {
     this.config = {
       strengthWeights: { ...DEFAULT_STRENGTH_WEIGHTS },
       scopeWeights: { ...DEFAULT_SCOPE_WEIGHTS },
+      scopeStrengthWeights: { ...DEFAULT_SCOPE_STRENGTH_WEIGHTS },
       gateWeights: { ...DEFAULT_GATE_WEIGHTS },
-      localYSignalWeights: cloneJSON(DEFAULT_LOCAL_Y_SIGNAL_WEIGHTS),
       axisSaturation: {
         empathyPracticality: 2.5,
         wisdomKnowledge: 2.5,
         epistemicStability: 2.5,
       },
-      compactSignalScale: 0.65,
-      integrationInfluence: 0.35,
-      positiveGateInfluence: 0.35,
-      negativeGateInfluence: 0.45,
-      contradictionPenaltyScale: 0.22,
-      softNegativeSignalScale: 0.4,
-      hardNegativeSignalScale: 1.0,
-      gateDerivedSignalScale: 1.0,
-      gateToLocalSignalMap: cloneJSON(DEFAULT_GATE_TO_LOCAL_SIGNAL_MAP),
-      axisAcknowledgementMultiplier: 0.45,
+      integrationSaturation: 1.0,
+      integrationBonusWeight: 0.7,
+      unresolvedAsymmetryPenaltyWeight: 0.55,
+      positiveGateInfluence: 0.16,
+      negativeGateInfluence: 0.28,
+      contradictionPenaltyScale: 1.0,
       rejectInvalidTriggeredGateEvents: true,
       epsilon: 1e-9,
       summaryAxisFloor: 0.04,
@@ -327,6 +240,12 @@ export class EpistemicProfiler {
 
   static clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
+  }
+
+  static saturate(value, scale = 1) {
+    const numeric = Math.max(0, Number(value) || 0);
+    const safeScale = Math.max(1e-9, Number(scale) || 1);
+    return numeric <= 0 ? 0 : numeric / (numeric + safeScale);
   }
 
   static formatSigned(value, digits = 2) {
@@ -351,23 +270,11 @@ export class EpistemicProfiler {
     const normalized = cleanString(label).toLowerCase();
     const map = {
       empathy: { axis: "empathyPracticality", direction: "empathy", sign: 1 },
-      practicality: {
-        axis: "empathyPracticality",
-        direction: "practicality",
-        sign: -1,
-      },
+      practicality: { axis: "empathyPracticality", direction: "practicality", sign: -1 },
       wisdom: { axis: "wisdomKnowledge", direction: "wisdom", sign: 1 },
       knowledge: { axis: "wisdomKnowledge", direction: "knowledge", sign: -1 },
-      stability: {
-        axis: "epistemicStability",
-        direction: "positive",
-        sign: 1,
-      },
-      instability: {
-        axis: "epistemicStability",
-        direction: "negative",
-        sign: -1,
-      },
+      stability: { axis: "epistemicStability", direction: "positive", sign: 1 },
+      instability: { axis: "epistemicStability", direction: "negative", sign: -1 },
     };
     return map[normalized] || null;
   }
@@ -379,13 +286,11 @@ export class EpistemicProfiler {
     for (const rawLine of values) {
       const line = cleanString(rawLine);
       if (!line) continue;
-
       const regex = /([+-](?:\d+(?:\.\d+)?|\.\d+))\s+(stability|instability|empathy|practicality|wisdom|knowledge)\b/gi;
       for (const match of line.matchAll(regex)) {
         const signedNumber = Number(match[1]);
         const labelInfo = EpistemicProfiler.axisDirectionFromProfileLabel(match[2]);
         if (!labelInfo || !Number.isFinite(signedNumber)) continue;
-
         signals.push({
           axis: labelInfo.axis,
           direction: labelInfo.direction,
@@ -409,6 +314,11 @@ export class EpistemicProfiler {
     return this.config.scopeWeights[normalized] ?? this.config.scopeWeights.stance;
   }
 
+  scopeStrengthWeight(scopeStrength) {
+    const normalized = cleanString(scopeStrength).toLowerCase();
+    return this.config.scopeStrengthWeights[normalized] ?? this.config.scopeStrengthWeights.low;
+  }
+
   gateWeight(gate) {
     return this.config.gateWeights[gate] ?? 1;
   }
@@ -416,63 +326,51 @@ export class EpistemicProfiler {
   inferScope(payload = {}) {
     const explicit = cleanString(payload.analysis_scope).toLowerCase();
     if (this.config.scopeWeights[explicit]) return explicit;
-
-    const evidenceCount = Array.isArray(payload.evidence) ? payload.evidence.length : 0;
-    const gateCount = Array.isArray(payload.triggered_gate_events)
+    const evidenceCount = Array.isArray(payload.triggered_gate_events)
       ? payload.triggered_gate_events.length
       : 0;
     const principleCount = Array.isArray(payload?.local_extraction?.principles)
       ? payload.local_extraction.principles.length
       : 0;
-    if (evidenceCount + gateCount + principleCount >= 6) return "full_profile_import";
-    if (evidenceCount + gateCount + principleCount >= 3) return "worldview_fragment";
-    if (evidenceCount + gateCount + principleCount >= 1) return "stance";
+    const semanticGridCount = this.hasSemanticGridData(payload.semantic_grid || payload.semanticGrid)
+      ? 1
+      : 0;
+    const total = evidenceCount + principleCount + semanticGridCount;
+    if (total >= 6) return "full_profile_import";
+    if (total >= 3) return "worldview_fragment";
+    if (total >= 1) return "stance";
     return "thought";
   }
 
   inferScopeStrength(scope, payload = {}) {
     const explicit = cleanString(payload.scope_strength).toLowerCase();
     if (["low", "medium", "high"].includes(explicit)) return explicit;
-    const score =
-      (Array.isArray(payload.evidence) ? payload.evidence.length : 0) +
-      (Array.isArray(payload.triggered_gate_events) ? payload.triggered_gate_events.length : 0) +
-      cleanStringList(payload?.profile || []).length;
+    const profileCount = cleanStringList(payload.profile || []).length;
+    const gateCount = Array.isArray(payload.triggered_gate_events) ? payload.triggered_gate_events.length : 0;
+    const semanticGridCount = this.hasSemanticGridData(payload.semantic_grid || payload.semanticGrid) ? 2 : 0;
+    const score = profileCount + gateCount + semanticGridCount;
     if (score >= 6) return "high";
     if (score >= 3) return "medium";
     return "low";
   }
 
+  hasSemanticGridData(input = {}) {
+    if (!input || typeof input !== "object") return false;
+    return GRID_KEYS.some((key) => {
+      const value = bucketAliases(key).map((alias) => input?.[alias]).find((candidate) => hasGridBucketValue(candidate));
+      if (!hasGridBucketValue(value)) return false;
+      const bucket = normalizeGridBucket(value);
+      return bucket.support > 0 || bucket.confidence > 0 || bucket.evidence_spans.length > 0;
+    });
+  }
 
-normalizeAxisEventList(items = []) {
-  if (!Array.isArray(items)) return [];
-  return items
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
-      const hasExplicitStrength = cleanString(item.strength).length > 0;
-      const hasExplicitConfidence = item.confidence !== undefined && item.confidence !== null && `${item.confidence}` !== "";
-      return {
-        ...item,
-        strength: cleanString(item.strength).toLowerCase() || "moderate",
-        confidence: EpistemicProfiler.clamp(Number(item.confidence ?? 1), 0, 1),
-        evidence_span: normalizeEvidenceSpan(item.evidence_span || item.excerpt || item.reason),
-        _strength_explicit: hasExplicitStrength,
-        _confidence_explicit: hasExplicitConfidence,
-      };
-    })
-    .filter(Boolean);
-}
-
-normalizeSignalList(items = [], fallbackPolarity = "positive") {
+  normalizeAxisEventList(items = []) {
     if (!Array.isArray(items)) return [];
     return items
       .map((item) => {
         if (!item || typeof item !== "object") return null;
         return {
           ...item,
-          polarity: cleanString(item.polarity).toLowerCase() || fallbackPolarity,
-          signal_type:
-            cleanString(item.signal_type || item.type || item.signal).toLowerCase() ||
-            `legacy_${fallbackPolarity}`,
           strength: cleanString(item.strength).toLowerCase() || "moderate",
           confidence: EpistemicProfiler.clamp(Number(item.confidence ?? 1), 0, 1),
           evidence_span: normalizeEvidenceSpan(item.evidence_span || item.excerpt || item.reason),
@@ -481,47 +379,25 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
       .filter(Boolean);
   }
 
-  axisAcknowledgementMultiplier(item = {}) {
-    const span = normalizeEvidenceSpan(item.evidence_span || item.excerpt || item.reason).toLowerCase();
-    if (!span) return 1;
-
-    const strongAcknowledgement = [
-      /\backnowledg(?:e|es|ed|ment)\b.*\bbut\b.*\bdeprioriti[sz](?:e|es|ed|ing)\b/i,
-      /\brecogniz(?:e|es|ed)\b.*\bbut\b.*\bdeprioriti[sz](?:e|es|ed|ing)\b/i,
-      /\bexists\b.*\bbut\b.*\bdeprioriti[sz](?:e|es|ed|ing)\b/i,
-      /\bonly acknowledged\b/i,
-      /\bmerely acknowledged\b/i,
-      /\backnowledged competing consideration\b/i,
-      /\bcounterweighted\b/i,
-      /\bdeprioriti[sz](?:e|es|ed|ing)\b/i,
-      /\bsecondary\b/i,
-      /\bsubordinate\b/i,
-      /\bnot primary\b/i,
-    ];
-    if (strongAcknowledgement.some((pattern) => pattern.test(span))) {
-      return Number(this.config.axisAcknowledgementMultiplier ?? 0.45);
-    }
-
-    const mildAcknowledgement = [
-      /\backnowledg(?:e|es|ed|ment)\b/i,
-      /\brecogniz(?:e|es|ed)\b/i,
-      /\badmit(?:s|ted)?\b/i,
-      /\bnotes?\b/i,
-      /\baware of\b/i,
-      /\bexists\b/i,
-      /\bpresent\b/i,
-      /\bimpulse to\b/i,
-    ];
-    if (mildAcknowledgement.some((pattern) => pattern.test(span))) {
-      return 0.75;
-    }
-
-    return 1;
+  normalizeSignalList(items = [], fallbackPolarity = "positive") {
+    if (!Array.isArray(items)) return [];
+    return items
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        return {
+          ...item,
+          polarity: cleanString(item.polarity).toLowerCase() || fallbackPolarity,
+          signal_type: cleanString(item.signal_type || item.type || item.signal).toLowerCase() || `legacy_${fallbackPolarity}`,
+          strength: cleanString(item.strength).toLowerCase() || "moderate",
+          confidence: EpistemicProfiler.clamp(Number(item.confidence ?? 1), 0, 1),
+          evidence_span: normalizeEvidenceSpan(item.evidence_span || item.excerpt || item.reason),
+        };
+      })
+      .filter(Boolean);
   }
 
   normalizeGateEvents(items = []) {
     if (!Array.isArray(items)) return { accepted: [], rejected: [] };
-
     const accepted = [];
     const rejected = [];
 
@@ -530,19 +406,16 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
         rejected.push({ reason: "non_object_gate_event", raw: item });
         continue;
       }
-
       const gate = cleanString(item.gate);
       if (!gate || !(gate in this.state.gateStates)) {
         rejected.push({ reason: "unknown_gate", raw: item });
         continue;
       }
-
       const direction = cleanString(item.direction).toLowerCase();
       if (!["positive", "negative"].includes(direction)) {
         rejected.push({ reason: "invalid_gate_direction", raw: item, gate, direction });
         continue;
       }
-
       accepted.push({
         gate,
         direction,
@@ -550,7 +423,6 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
         confidence: EpistemicProfiler.clamp(Number(item.confidence ?? 1), 0.5, 1),
         novelty: EpistemicProfiler.clamp(Number(item.novelty ?? 1), 0, 1),
         evidence_span: normalizeEvidenceSpan(item.evidence_span || item.reason),
-        scope: cleanString(item.scope),
       });
     }
 
@@ -582,11 +454,8 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
       "retractions",
       "restatements",
     ];
-
     const out = {};
-    for (const key of keys) {
-      out[key] = Array.isArray(input?.[key]) ? input[key] : [];
-    }
+    for (const key of keys) out[key] = Array.isArray(input?.[key]) ? input[key] : [];
     return out;
   }
 
@@ -610,12 +479,7 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
         if (direction === "empathy" || direction === "practicality") {
           xPole.push({ pole: direction, strength, confidence, evidence_span: evidenceSpan });
         } else if (direction === "mixed") {
-          xIntegration.push({
-            type: "integrated_tension",
-            strength,
-            confidence,
-            evidence_span: evidenceSpan,
-          });
+          xIntegration.push({ type: "integrated_tension", strength, confidence, evidence_span: evidenceSpan });
         }
       }
 
@@ -623,12 +487,7 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
         if (direction === "wisdom" || direction === "knowledge") {
           zPole.push({ pole: direction, strength, confidence, evidence_span: evidenceSpan });
         } else if (direction === "mixed") {
-          zIntegration.push({
-            type: "integrated_tension",
-            strength,
-            confidence,
-            evidence_span: evidenceSpan,
-          });
+          zIntegration.push({ type: "integrated_tension", strength, confidence, evidence_span: evidenceSpan });
         }
       }
 
@@ -674,19 +533,9 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
       const strength = magnitude >= 0.75 ? "strong" : magnitude >= 0.4 ? "moderate" : "weak";
       const confidence = EpistemicProfiler.clamp(magnitude, 0.35, 1);
       if (signal.axis === "empathyPracticality") {
-        axis_events.x_pole_evidence.push({
-          pole: signal.direction,
-          strength,
-          confidence,
-          evidence_span: signal.source,
-        });
+        axis_events.x_pole_evidence.push({ pole: signal.direction, strength, confidence, evidence_span: signal.source });
       } else if (signal.axis === "wisdomKnowledge") {
-        axis_events.z_pole_evidence.push({
-          pole: signal.direction,
-          strength,
-          confidence,
-          evidence_span: signal.source,
-        });
+        axis_events.z_pole_evidence.push({ pole: signal.direction, strength, confidence, evidence_span: signal.source });
       } else if (signal.axis === "epistemicStability") {
         const target = signal.direction === "negative" ? local_y_negative_signals : local_y_positive_signals;
         target.push({
@@ -699,192 +548,97 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
       }
     }
 
-    return {
-      compactSignals,
-      axis_events,
-      local_y_positive_signals,
-      local_y_negative_signals,
-    };
-  }
-
-  gateEventsFromProfileUpdates(profile_update_signals = {}, explicitGateEvents = []) {
-    const out = [];
-    const explicitKeys = new Set(
-      (Array.isArray(explicitGateEvents) ? explicitGateEvents : [])
-        .map((item) => {
-          const gate = cleanString(item?.gate);
-          const direction = cleanString(item?.direction).toLowerCase();
-          return gate && direction ? `${gate}::${direction}` : "";
-        })
-        .filter(Boolean),
-    );
-
-    const buildFallbackEvent = (item, direction) => {
-      const gate = cleanString(item?.gate || item?.name || item);
-      if (!(gate in this.state.gateStates)) return null;
-      if (explicitKeys.has(`${gate}::${direction}`)) return null;
-      return {
-        gate,
-        direction,
-        strength: cleanString(item?.strength).toLowerCase() || "weak",
-        confidence: EpistemicProfiler.clamp(Number(item?.confidence ?? 0.65), 0.5, 1),
-        novelty: EpistemicProfiler.clamp(Number(item?.novelty ?? 0.5), 0, 1),
-        evidence_span: normalizeEvidenceSpan(item?.evidence_span || item?.reason),
-      };
-    };
-
-    for (const item of Array.isArray(profile_update_signals.cleared_gates)
-      ? profile_update_signals.cleared_gates
-      : []) {
-      const event = buildFallbackEvent(item, "positive");
-      if (event) out.push(event);
-    }
-    for (const item of Array.isArray(profile_update_signals.failed_gates)
-      ? profile_update_signals.failed_gates
-      : []) {
-      const event = buildFallbackEvent(item, "negative");
-      if (event) out.push(event);
-    }
-    return out;
+    return { compactSignals, axis_events, local_y_positive_signals, local_y_negative_signals };
   }
 
   payloadHasStructuredScorableSignals(payload = {}) {
     const axisEvents = payload.axis_events || {};
     const localExtraction = payload.local_extraction || {};
-    const extractionKeys = [
-      "principles",
-      "boundaries",
-      "claimed_values",
-      "tradeoffs",
-      "contradictions",
-    ];
+    const extractionKeys = ["principles", "boundaries", "claimed_values", "tradeoffs", "contradictions"];
 
     return Boolean(
+      this.hasSemanticGridData(payload.semantic_grid || payload.semanticGrid) ||
       (Array.isArray(payload.evidence) && payload.evidence.length) ||
-        (Array.isArray(payload.triggered_gate_events) && payload.triggered_gate_events.length) ||
-        (Array.isArray(payload.local_y_positive_signals) && payload.local_y_positive_signals.length) ||
-        (Array.isArray(payload.local_y_negative_signals) && payload.local_y_negative_signals.length) ||
-        (Array.isArray(axisEvents.x_pole_evidence) && axisEvents.x_pole_evidence.length) ||
-        (Array.isArray(axisEvents.x_integration_events) && axisEvents.x_integration_events.length) ||
-        (Array.isArray(axisEvents.z_pole_evidence) && axisEvents.z_pole_evidence.length) ||
-        (Array.isArray(axisEvents.z_integration_events) && axisEvents.z_integration_events.length) ||
-        extractionKeys.some((key) => Array.isArray(localExtraction[key]) && localExtraction[key].length),
+      (Array.isArray(payload.triggered_gate_events) && payload.triggered_gate_events.length) ||
+      (Array.isArray(payload.local_y_positive_signals) && payload.local_y_positive_signals.length) ||
+      (Array.isArray(payload.local_y_negative_signals) && payload.local_y_negative_signals.length) ||
+      (Array.isArray(axisEvents.x_pole_evidence) && axisEvents.x_pole_evidence.length) ||
+      (Array.isArray(axisEvents.x_integration_events) && axisEvents.x_integration_events.length) ||
+      (Array.isArray(axisEvents.z_pole_evidence) && axisEvents.z_pole_evidence.length) ||
+      (Array.isArray(axisEvents.z_integration_events) && axisEvents.z_integration_events.length) ||
+      extractionKeys.some((key) => Array.isArray(localExtraction[key]) && localExtraction[key].length)
     );
   }
 
-  localYSignalWeight(signal) {
-    const polarity = cleanString(signal?.polarity).toLowerCase();
-    const signalType = cleanString(signal?.signal_type).toLowerCase();
-    if (!DEFAULT_SIGNAL_TYPES[polarity]?.has(signalType)) return 1;
-    const bucket = this.config.localYSignalWeights?.[polarity] || {};
-    return Number(bucket?.[signalType]) || 1;
-  }
-
-  isSoftNegativeSignal(signal) {
-    const signalType = cleanString(signal?.signal_type).toLowerCase();
-    return DEFAULT_SOFT_NEGATIVE_SIGNAL_TYPES.has(signalType);
-  }
-
-  deriveGateBackfilledLocalSignals(entry) {
-    const out = { positive: [], negative: [] };
-    const seen = {
-      positive: new Set(
-        (entry.local_y_positive_signals || [])
-          .map((signal) => cleanString(signal?.signal_type).toLowerCase())
-          .filter(Boolean),
-      ),
-      negative: new Set(
-        (entry.local_y_negative_signals || [])
-          .map((signal) => cleanString(signal?.signal_type).toLowerCase())
-          .filter(Boolean),
-      ),
+  bucketFromWeightedItems(items = []) {
+    const normalized = Array.isArray(items) ? items : [items];
+    const weightedSupport = normalized.reduce(
+      (sum, item) => sum + this.strengthWeight(item?.strength) * EpistemicProfiler.clamp(Number(item?.confidence ?? 1), 0, 1),
+      0,
+    );
+    const confidence = normalized.length
+      ? EpistemicProfiler.clamp(
+          normalized.reduce((sum, item) => sum + EpistemicProfiler.clamp(Number(item?.confidence ?? 1), 0, 1), 0) /
+            normalized.length,
+          0,
+          1,
+        )
+      : 0;
+    return {
+      support: EpistemicProfiler.clamp(weightedSupport, 0, 1),
+      confidence,
+      evidence_spans: compactEvidenceSpans(normalized.map((item) => item?.evidence_span)),
     };
+  }
 
-    for (const event of entry.triggered_gate_events || []) {
-      const polarity = cleanString(event?.direction).toLowerCase();
-      if (!["positive", "negative"].includes(polarity)) continue;
-      const mappedSignal =
-        this.config.gateToLocalSignalMap?.[polarity]?.[event.gate] ||
-        DEFAULT_GATE_TO_LOCAL_SIGNAL_MAP?.[polarity]?.[event.gate];
-      const signalType = cleanString(mappedSignal).toLowerCase();
-      if (!signalType || seen[polarity].has(signalType)) continue;
+  deriveSemanticGridFromStructured({ axis_events = {}, local_y_positive_signals = [], local_y_negative_signals = [] } = {}) {
+    const xPole = Array.isArray(axis_events.x_pole_evidence) ? axis_events.x_pole_evidence : [];
+    const zPole = Array.isArray(axis_events.z_pole_evidence) ? axis_events.z_pole_evidence : [];
+    const xIntegration = Array.isArray(axis_events.x_integration_events) ? axis_events.x_integration_events : [];
+    const zIntegration = Array.isArray(axis_events.z_integration_events) ? axis_events.z_integration_events : [];
 
-      if (polarity === "negative" && entry.local_y_negative_signals?.length) {
-        continue;
-      }
+    return {
+      empathy: this.bucketFromWeightedItems(xPole.filter((item) => cleanString(item.pole).toLowerCase() === "empathy")),
+      practicality: this.bucketFromWeightedItems(xPole.filter((item) => cleanString(item.pole).toLowerCase() === "practicality")),
+      wisdom: this.bucketFromWeightedItems(zPole.filter((item) => cleanString(item.pole).toLowerCase() === "wisdom")),
+      knowledge: this.bucketFromWeightedItems(zPole.filter((item) => cleanString(item.pole).toLowerCase() === "knowledge")),
+      x_integration: this.bucketFromWeightedItems(xIntegration),
+      z_integration: this.bucketFromWeightedItems(zIntegration),
+      y_positive: this.bucketFromWeightedItems(local_y_positive_signals),
+      y_negative: this.bucketFromWeightedItems(local_y_negative_signals),
+    };
+  }
 
-      const confidence = EpistemicProfiler.clamp(
-        Number(event.confidence ?? 1) * Number(this.config.gateDerivedSignalScale ?? 1),
-        0,
-        1,
-      );
-
-      out[polarity].push({
-        polarity,
-        signal_type: signalType,
-        strength: cleanString(event.strength).toLowerCase() || "moderate",
-        confidence,
-        evidence_span: normalizeEvidenceSpan(event.evidence_span),
-        derived_from_gate: event.gate,
-      });
-      seen[polarity].add(signalType);
+  normalizeSemanticGrid(input = {}, derived = {}) {
+    const out = emptySemanticGrid();
+    for (const key of GRID_KEYS) {
+      const aliases = bucketAliases(key);
+      const explicitValue = aliases
+        .map((alias) => input?.[alias])
+        .find((candidate) => hasGridBucketValue(candidate));
+      out[key] = hasGridBucketValue(explicitValue)
+        ? normalizeGridBucket(explicitValue)
+        : normalizeGridBucket(derived?.[key] || {});
     }
-
     return out;
   }
 
   buildFallbackProfileLine(entry) {
+    const grid = entry.semantic_grid || emptySemanticGrid();
+    const y = grid.y_positive.support - grid.y_negative.support;
+    const x = grid.empathy.support - grid.practicality.support;
+    const z = grid.wisdom.support - grid.knowledge.support;
     const parts = [];
-    const strongestY = [...entry.local_y_positive_signals, ...entry.local_y_negative_signals]
-      .sort((a, b) => {
-        const aValue = this.strengthWeight(a.strength) * (Number(a.confidence) || 1);
-        const bValue = this.strengthWeight(b.strength) * (Number(b.confidence) || 1);
-        return bValue - aValue;
-      })[0];
-
-    const strongestX = entry.axis_events.x_pole_evidence
-      .slice()
-      .sort((a, b) => {
-        const aValue = this.strengthWeight(a.strength) * (Number(a.confidence) || 1);
-        const bValue = this.strengthWeight(b.strength) * (Number(b.confidence) || 1);
-        return bValue - aValue;
-      })[0];
-
-    const strongestZ = entry.axis_events.z_pole_evidence
-      .slice()
-      .sort((a, b) => {
-        const aValue = this.strengthWeight(a.strength) * (Number(a.confidence) || 1);
-        const bValue = this.strengthWeight(b.strength) * (Number(b.confidence) || 1);
-        return bValue - aValue;
-      })[0];
-
-    if (strongestY) {
-      const sign = strongestY.polarity === "negative" ? -1 : 1;
-      parts.push(
-        `${EpistemicProfiler.formatSigned(
-          sign * this.strengthWeight(strongestY.strength) * (Number(strongestY.confidence) || 1),
-        )} ${strongestY.polarity === "negative" ? "instability" : "stability"}`,
-      );
+    if (Math.abs(y) > this.config.epsilon) {
+      parts.push(`${EpistemicProfiler.formatSigned(y)} ${y >= 0 ? "stability" : "instability"}`);
     }
-    if (strongestX) {
-      const sign = strongestX.pole === "practicality" ? -1 : 1;
-      parts.push(
-        `${EpistemicProfiler.formatSigned(
-          sign * this.strengthWeight(strongestX.strength) * (Number(strongestX.confidence) || 1),
-        )} ${strongestX.pole}`,
-      );
+    if (Math.abs(x) > this.config.epsilon) {
+      parts.push(`${EpistemicProfiler.formatSigned(x)} ${x >= 0 ? "empathy" : "practicality"}`);
     }
-    if (strongestZ) {
-      const sign = strongestZ.pole === "knowledge" ? -1 : 1;
-      parts.push(
-        `${EpistemicProfiler.formatSigned(
-          sign * this.strengthWeight(strongestZ.strength) * (Number(strongestZ.confidence) || 1),
-        )} ${strongestZ.pole}`,
-      );
+    if (Math.abs(z) > this.config.epsilon) {
+      parts.push(`${EpistemicProfiler.formatSigned(z)} ${z >= 0 ? "wisdom" : "knowledge"}`);
     }
-
-    if (!parts.length) return null;
-    return `${parts.slice(0, 3).join(" ")} | synthesized from structured extraction`;
+    return parts.length ? `${parts.join(" ")} | synthesized from dense support grid` : null;
   }
 
   normalizePayload(payload = {}) {
@@ -902,12 +656,7 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
     const compact = structuredScorableSignalsPresent
       ? {
           compactSignals: [],
-          axis_events: {
-            x_pole_evidence: [],
-            x_integration_events: [],
-            z_pole_evidence: [],
-            z_integration_events: [],
-          },
+          axis_events: { x_pole_evidence: [], x_integration_events: [], z_pole_evidence: [], z_integration_events: [] },
           local_y_positive_signals: [],
           local_y_negative_signals: [],
         }
@@ -947,25 +696,22 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
     ];
 
     const local_extraction = this.normalizeLocalExtraction(payload.local_extraction || {});
-    const profile_update_signals = this.normalizeProfileUpdateSignals(
-      payload.profile_update_signals || {},
-    );
-
+    const profile_update_signals = this.normalizeProfileUpdateSignals(payload.profile_update_signals || {});
     const normalizedGateResult = this.normalizeGateEvents(payload.triggered_gate_events || []);
-    const explicitGateEvents = normalizedGateResult.accepted;
+    const triggered_gate_events = normalizedGateResult.accepted;
     const invalidGateEvents = normalizedGateResult.rejected;
-    const triggered_gate_events = [
-      ...explicitGateEvents,
-      ...this.gateEventsFromProfileUpdates(profile_update_signals, explicitGateEvents),
-    ];
+    const derivedGrid = this.deriveSemanticGridFromStructured({ axis_events, local_y_positive_signals, local_y_negative_signals });
+    const semantic_grid = this.normalizeSemanticGrid(payload.semantic_grid || payload.semanticGrid || {}, derivedGrid);
 
     return {
       model: cleanString(payload.model) || "epistemic_octahedron_interpreter_v2",
+      profiler_mode: cleanString(payload.profiler_mode || payload.profilerMode) || (this.hasSemanticGridData(payload.semantic_grid || payload.semanticGrid) ? "dense_support_v1" : "legacy_structured_v1"),
       display_profile_lines,
       notes,
       analysis_scope,
       scope_strength,
       statement_modes: cleanStringList(payload.statement_modes || []),
+      semantic_grid,
       axis_events,
       local_y_positive_signals,
       local_y_negative_signals,
@@ -996,7 +742,13 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
       entry.notes.push(`invalid gate events ignored: ${messages}`);
     }
 
+    const gridHasSupport = GRID_KEYS.some((key) => {
+      const bucket = entry.semantic_grid?.[key];
+      return (bucket?.support || 0) > 0 || (bucket?.confidence || 0) > 0 || (bucket?.evidence_spans || []).length > 0;
+    });
+
     const hasSignals =
+      gridHasSupport ||
       entry.legacyEvidence.length ||
       entry.compactSignals.length ||
       entry.axis_events.x_pole_evidence.length ||
@@ -1010,9 +762,7 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
       entry.local_extraction.boundaries.length;
 
     if (!hasSignals) {
-      throw new Error(
-        "LLM payload must contain usable structured signals, compact profile signals, or extraction content.",
-      );
+      throw new Error("LLM payload must contain usable semantic_grid support, structured signals, compact profile signals, or extraction content.");
     }
 
     entry.fallback_profile_line = this.buildFallbackProfileLine(entry);
@@ -1055,31 +805,25 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
 
     for (const signal of entry.local_y_negative_signals) {
       const label = cleanString(signal.signal_type).replace(/_/g, " ");
-      if (!label) continue;
-      riskNotes.push(`risk: ${label}`);
+      if (label) riskNotes.push(`risk: ${label}`);
     }
 
     for (const contradiction of entry.local_extraction.contradictions) {
       const type = cleanString(contradiction?.contradiction_type).replace(/_/g, " ");
       const severity = cleanString(contradiction?.severity).toLowerCase();
-      riskNotes.push(
-        `risk: ${type || "contradiction"}${severity ? ` (${severity})` : ""}`,
-      );
+      riskNotes.push(`risk: ${type || "contradiction"}${severity ? ` (${severity})` : ""}`);
     }
 
-    for (const item of entry.profile_update_signals.introduced_contradictions) {
-      const note = cleanString(item?.reason || item?.normalized || item);
-      if (note) riskNotes.push(`risk: contradiction introduced | ${note}`);
+    for (const event of entry.triggered_gate_events || []) {
+      if (event.direction === "negative") riskNotes.push(`risk: ${event.gate}`);
     }
 
-    profileState.risk_notes = dedupeLatestFirst([
-      ...profileState.risk_notes,
-      ...riskNotes,
-    ]).slice(0, 18);
+    profileState.risk_notes = dedupeLatestFirst([...profileState.risk_notes, ...riskNotes]).slice(0, 18);
   }
 
   mergeGateEvents(entry) {
     const scopeWeight = this.scopeWeight(entry.analysis_scope);
+    const scopeStrengthWeight = this.scopeStrengthWeight(entry.scope_strength);
 
     for (const event of entry.triggered_gate_events) {
       const gateState = this.state.gateStates[event.gate];
@@ -1090,7 +834,8 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
       const gateWeight = this.gateWeight(event.gate);
       const confidence = EpistemicProfiler.clamp(Number(event.confidence ?? 1), 0.5, 1);
       const novelty = EpistemicProfiler.clamp(Number(event.novelty ?? 1), 0, 1);
-      const baseDelta = sign * strengthValue * scopeWeight * gateWeight * confidence * novelty;
+      const evidenceMultiplier = cleanString(event.evidence_span) ? 1 : 0.85;
+      const baseDelta = sign * strengthValue * scopeWeight * scopeStrengthWeight * gateWeight * confidence * novelty * evidenceMultiplier;
       const delta = EpistemicProfiler.clamp(baseDelta, -1, 1);
 
       const oldScore = Number(gateState.score) || 0;
@@ -1124,190 +869,14 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
     return this.state.entries.flatMap((entry) => entry.compactSignals || []);
   }
 
-
- axisContributionValue(item, scopeWeight, options = {}) {
-   const strength = this.strengthWeight(item?.strength);
-   const confidence = EpistemicProfiler.clamp(Number(item?.confidence ?? 1), 0, 1);
-   const acknowledgementMultiplier = options.applyAcknowledgementDamping
-     ? this.axisAcknowledgementMultiplier(item)
-     : 1;
-   return strength * confidence * scopeWeight * acknowledgementMultiplier;
- }
-
- entryAxisTieBreakBias(entry, axisKey) {
-   const keywordSet = AXIS_TIE_BREAK_KEYWORDS[axisKey];
-   if (!keywordSet) {
-     return { bias: 0, positiveScore: 0, negativeScore: 0, snippets: 0 };
-   }
-
-   const snippets = [];
-   snippets.push(...cleanStringList(entry.display_profile_lines || []));
-   snippets.push(...cleanStringList(entry.notes || []));
-
-   for (const key of ["principles", "boundaries", "claimed_values", "tradeoffs", "contradictions"]) {
-     for (const item of entry.local_extraction?.[key] || []) {
-       snippets.push(...collectTextSnippets(item));
-     }
-   }
-
-   const poleKey = axisKey === "empathyPracticality" ? "x_pole_evidence" : "z_pole_evidence";
-   const integrationKey = axisKey === "empathyPracticality" ? "x_integration_events" : "z_integration_events";
-   for (const item of entry.axis_events?.[poleKey] || []) {
-     snippets.push(...collectTextSnippets(item));
-   }
-   for (const item of entry.axis_events?.[integrationKey] || []) {
-     snippets.push(...collectTextSnippets(item));
-   }
-
-   const corpus = snippets.filter(Boolean).join("\n");
-   if (!corpus.trim()) {
-     return { bias: 0, positiveScore: 0, negativeScore: 0, snippets: 0 };
-   }
-
-   const positiveScore = keywordWeightFromText(corpus, keywordSet.positive);
-   const negativeScore = keywordWeightFromText(corpus, keywordSet.negative);
-   const total = positiveScore + negativeScore;
-   const bias = total > 0 ? (positiveScore - negativeScore) / total : 0;
-   return {
-     bias: EpistemicProfiler.clamp(bias, -1, 1),
-     positiveScore,
-     negativeScore,
-     snippets: snippets.length,
-   };
- }
-
-  aggregateLateralAxis(axisKey) {
-    const poleKey = axisKey === "empathyPracticality" ? "x_pole_evidence" : "z_pole_evidence";
-    const integrationKey =
-      axisKey === "empathyPracticality" ? "x_integration_events" : "z_integration_events";
-    const positivePole = axisKey === "empathyPracticality" ? "empathy" : "wisdom";
-    const negativePole = axisKey === "empathyPracticality" ? "practicality" : "knowledge";
-
-    let positiveTotal = 0;
-    let negativeTotal = 0;
-    let integrationTotal = 0;
-    let sourceCount = 0;
-    let explicitPoleWeightCount = 0;
-    let defaultedPoleWeightCount = 0;
-    let explicitBalanceCount = 0;
-    let tieBiasAccumulator = 0;
-    let tieBiasWeight = 0;
-    let tieBreakPositiveScore = 0;
-    let tieBreakNegativeScore = 0;
-
-    for (const entry of this.state.entries) {
-      const scopeWeight = this.scopeWeight(entry.analysis_scope);
-      let entryHasPositive = false;
-      let entryHasNegative = false;
-
-      for (const item of entry.axis_events[poleKey] || []) {
-        const value = this.axisContributionValue(item, scopeWeight, { applyAcknowledgementDamping: true });
-        const pole = cleanString(item.pole).toLowerCase();
-        if (pole === positivePole) {
-          positiveTotal += value;
-          entryHasPositive = true;
-        }
-        if (pole === negativePole) {
-          negativeTotal += value;
-          entryHasNegative = true;
-        }
-        if (item._strength_explicit || item._confidence_explicit) explicitPoleWeightCount += 1;
-        else defaultedPoleWeightCount += 1;
-        sourceCount += 1;
-      }
-
-      for (const item of entry.axis_events[integrationKey] || []) {
-        integrationTotal += this.axisContributionValue(item, scopeWeight);
-        if (cleanString(item.type).toLowerCase() === "explicit_balance") explicitBalanceCount += 1;
-        sourceCount += 1;
-      }
-
-      for (const signal of entry.compactSignals || []) {
-        if (signal.axis !== axisKey) continue;
-        const value = Number(signal.value);
-        if (!Number.isFinite(value)) continue;
-        const weight = Math.abs(value) * this.config.compactSignalScale;
-        if (weight <= 0) continue;
-        if (value >= 0) positiveTotal += weight;
-        else negativeTotal += weight;
-        sourceCount += 1;
-      }
-
-      if (entryHasPositive && entryHasNegative) {
-        const tieBreak = this.entryAxisTieBreakBias(entry, axisKey);
-        if (Math.abs(tieBreak.bias) > this.config.epsilon) {
-          tieBiasAccumulator += tieBreak.bias * scopeWeight;
-          tieBiasWeight += scopeWeight;
-          tieBreakPositiveScore += tieBreak.positiveScore;
-          tieBreakNegativeScore += tieBreak.negativeScore;
-        }
-      }
-    }
-
-    const poleMagnitude = positiveTotal + negativeTotal;
-    const saturation = this.config.axisSaturation[axisKey] ?? 2.5;
-    const integrationRatio = poleMagnitude + integrationTotal > 0
-      ? integrationTotal / (poleMagnitude + integrationTotal)
-      : 0;
-
-    let poleDelta = positiveTotal - negativeTotal;
-    const defaultWeightedBalance =
-      poleMagnitude > this.config.epsilon &&
-      positiveTotal > this.config.epsilon &&
-      negativeTotal > this.config.epsilon &&
-      Math.abs(poleDelta) <= this.config.epsilon &&
-      explicitPoleWeightCount === 0;
-
-    let tieBreakApplied = false;
-    let tieBreakBias = 0;
-    let tieBreakDelta = 0;
-    if (defaultWeightedBalance && explicitBalanceCount === 0 && tieBiasWeight > this.config.epsilon) {
-      tieBreakBias = EpistemicProfiler.clamp(tieBiasAccumulator / tieBiasWeight, -1, 1);
-      tieBreakDelta =
-        tieBreakBias * poleMagnitude * (this.config.axisTieBreakInfluence ?? DEFAULT_AXIS_TIE_BREAK_INFLUENCE);
-      if (Math.abs(tieBreakDelta) > this.config.epsilon) {
-        poleDelta += tieBreakDelta;
-        tieBreakApplied = true;
-      }
-    }
-
-    const moderatedDelta = poleDelta * (1 - integrationRatio * this.config.integrationInfluence);
-    const raw = poleMagnitude <= this.config.epsilon
-      ? 0
-      : EpistemicProfiler.clamp(moderatedDelta / saturation, -1, 1);
-
-    return {
-      axis: axisKey,
-      raw,
-      positiveTotal,
-      negativeTotal,
-      integrationTotal,
-      integrationRatio,
-      poleMagnitude,
-      poleDelta,
-      moderatedDelta,
-      saturation,
-      sourceCount,
-      explicitPoleWeightCount,
-      defaultedPoleWeightCount,
-      explicitBalanceCount,
-      defaultWeightedBalance,
-      tieBreakApplied,
-      tieBreakBias,
-      tieBreakDelta,
-      tieBreakPositiveScore,
-      tieBreakNegativeScore,
-    };
-  }
-
   contradictionPenaltyForEntry(entry) {
     let penalty = 0;
-    const scopeWeight = this.scopeWeight(entry.analysis_scope);
-    const contradictionWeights = { low: 0.12, medium: 0.24, high: 0.4 };
+    const scopeFactor = this.scopeWeight(entry.analysis_scope) * this.scopeStrengthWeight(entry.scope_strength);
+    const contradictionWeights = { low: 0.08, medium: 0.16, high: 0.3 };
 
     for (const contradiction of entry.local_extraction.contradictions || []) {
       const severity = cleanString(contradiction?.severity).toLowerCase();
-      penalty += (contradictionWeights[severity] ?? contradictionWeights.medium) * scopeWeight;
+      penalty += (contradictionWeights[severity] ?? contradictionWeights.medium) * scopeFactor;
     }
 
     const introducedCount = Array.isArray(entry.profile_update_signals.introduced_contradictions)
@@ -1316,63 +885,107 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
     const resolvedCount = Array.isArray(entry.profile_update_signals.resolved_contradictions)
       ? entry.profile_update_signals.resolved_contradictions.length
       : 0;
-    penalty += introducedCount * 0.12 * scopeWeight;
-    penalty -= resolvedCount * 0.06 * scopeWeight;
 
+    penalty += introducedCount * 0.08 * scopeFactor;
+    penalty -= resolvedCount * 0.04 * scopeFactor;
     return Math.max(0, penalty);
   }
 
-  aggregateY() {
-    let positiveSum = 0;
-    let softNegativeSum = 0;
-    let hardNegativeSum = 0;
-    let contradictionPenalty = 0;
-    let positiveSignalCount = 0;
-    let negativeSignalCount = 0;
-    let derivedPositiveSignalCount = 0;
-    let derivedNegativeSignalCount = 0;
+  computeDenseSupportTotals() {
+    const totals = Object.fromEntries(GRID_KEYS.map((key) => [key, 0]));
+    const counts = Object.fromEntries(GRID_KEYS.map((key) => [key, 0]));
+    const evidence_spans = Object.fromEntries(GRID_KEYS.map((key) => [key, []]));
 
     for (const entry of this.state.entries) {
-      const scopeWeight = this.scopeWeight(entry.analysis_scope);
-      contradictionPenalty += this.contradictionPenaltyForEntry(entry);
-
-      const derivedSignals = this.deriveGateBackfilledLocalSignals(entry);
-      const positiveSignals = [
-        ...(entry.local_y_positive_signals || []),
-        ...(derivedSignals.positive || []),
-      ];
-      const negativeSignals = [
-        ...(entry.local_y_negative_signals || []),
-        ...(derivedSignals.negative || []),
-      ];
-
-      derivedPositiveSignalCount += (derivedSignals.positive || []).length;
-      derivedNegativeSignalCount += (derivedSignals.negative || []).length;
-
-      for (const signal of positiveSignals) {
-        positiveSum +=
-          this.axisContributionValue(signal, scopeWeight) * this.localYSignalWeight(signal);
-        positiveSignalCount += 1;
-      }
-      for (const signal of negativeSignals) {
-        const weightedValue =
-          this.axisContributionValue(signal, scopeWeight) * this.localYSignalWeight(signal);
-        if (this.isSoftNegativeSignal(signal)) {
-          softNegativeSum += weightedValue;
-        } else {
-          hardNegativeSum += weightedValue;
-        }
-        negativeSignalCount += 1;
+      const scopeFactor = this.scopeWeight(entry.analysis_scope) * this.scopeStrengthWeight(entry.scope_strength);
+      for (const key of GRID_KEYS) {
+        const bucket = entry.semantic_grid?.[key] || { support: 0, confidence: 0, evidence_spans: [] };
+        const value = bucket.support * bucket.confidence * scopeFactor;
+        totals[key] += value;
+        if (value > this.config.epsilon) counts[key] += 1;
+        evidence_spans[key].push(...(bucket.evidence_spans || []));
       }
     }
 
-    const effectiveNegativeSum =
-      softNegativeSum * Number(this.config.softNegativeSignalScale ?? 1) +
-      hardNegativeSum * Number(this.config.hardNegativeSignalScale ?? 1);
+    return {
+      totals,
+      counts,
+      evidence_spans: Object.fromEntries(
+        GRID_KEYS.map((key) => [key, compactEvidenceSpans(evidence_spans[key])]),
+      ),
+      entryCount: this.state.entries.length,
+    };
+  }
+
+  aggregateLateralAxis(axisKey, supportSummary = this.computeDenseSupportTotals()) {
+    const positiveKey = axisKey === "empathyPracticality" ? "empathy" : "wisdom";
+    const negativeKey = axisKey === "empathyPracticality" ? "practicality" : "knowledge";
+    const integrationKey = axisKey === "empathyPracticality" ? "x_integration" : "z_integration";
+
+    const positiveTotal = Number(supportSummary.totals[positiveKey]) || 0;
+    const negativeTotal = Number(supportSummary.totals[negativeKey]) || 0;
+    const integrationTotal = Number(supportSummary.totals[integrationKey]) || 0;
+    const saturation = this.config.axisSaturation[axisKey] ?? 2.5;
+    const integrationRatio = EpistemicProfiler.saturate(integrationTotal, this.config.integrationSaturation);
+    const poleDelta = positiveTotal - negativeTotal;
+    const poleMagnitude = positiveTotal + negativeTotal;
+    const balanceTotal = Math.min(positiveTotal, negativeTotal);
+    const resolvedBalance = balanceTotal * integrationRatio;
+    const unresolvedAsymmetry = Math.abs(poleDelta) * (1 - integrationRatio);
+    const moderatedDelta = poleDelta * (1 - integrationRatio);
+    const raw = poleMagnitude <= this.config.epsilon ? 0 : EpistemicProfiler.clamp(moderatedDelta / saturation, -1, 1);
+
+    return {
+      axis: axisKey,
+      raw,
+      positiveTotal,
+      negativeTotal,
+      integrationTotal,
+      integrationRatio,
+      balanceTotal,
+      resolvedBalance,
+      unresolvedAsymmetry,
+      poleMagnitude,
+      poleDelta,
+      moderatedDelta,
+      saturation,
+      sourceCount:
+        (supportSummary.counts[positiveKey] || 0) +
+        (supportSummary.counts[negativeKey] || 0) +
+        (supportSummary.counts[integrationKey] || 0),
+      explicitPoleWeightCount: 0,
+      defaultedPoleWeightCount: 0,
+      explicitBalanceCount: 0,
+      defaultWeightedBalance: false,
+      tieBreakApplied: false,
+      tieBreakBias: 0,
+      tieBreakDelta: 0,
+      tieBreakPositiveScore: 0,
+      tieBreakNegativeScore: 0,
+      evidence_spans: {
+        positive: supportSummary.evidence_spans[positiveKey] || [],
+        negative: supportSummary.evidence_spans[negativeKey] || [],
+        integration: supportSummary.evidence_spans[integrationKey] || [],
+      },
+    };
+  }
+
+  aggregateY(supportSummary, xSummary, zSummary) {
+    const positiveSum = Number(supportSummary.totals.y_positive) || 0;
+    const negativeSum = Number(supportSummary.totals.y_negative) || 0;
+    const integrationBonus =
+      this.config.integrationBonusWeight * (xSummary.resolvedBalance + zSummary.resolvedBalance);
+    const unresolvedAsymmetryPenalty =
+      this.config.unresolvedAsymmetryPenaltyWeight * (xSummary.unresolvedAsymmetry + zSummary.unresolvedAsymmetry);
+
+    let contradictionPenalty = 0;
+    for (const entry of this.state.entries) {
+      contradictionPenalty += this.contradictionPenaltyForEntry(entry);
+    }
 
     const saturation = this.config.axisSaturation.epistemicStability ?? 2.5;
     const local_y_base = EpistemicProfiler.clamp(
-      (positiveSum - effectiveNegativeSum - contradictionPenalty * this.config.contradictionPenaltyScale) /
+      (positiveSum - negativeSum + integrationBonus - unresolvedAsymmetryPenalty - contradictionPenalty * this.config.contradictionPenaltyScale) /
         saturation,
       -1,
       1,
@@ -1388,9 +1001,7 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
 
     for (const [gate, data] of Object.entries(this.state.gateStates)) {
       const weight = this.gateWeight(gate);
-      if (data.positive_events || data.negative_events) {
-        weightedCoveredSum += weight;
-      }
+      if (data.positive_events || data.negative_events) weightedCoveredSum += weight;
       gateEventCount += data.positive_events + data.negative_events;
       if (data.score > 0) {
         weightedPositiveScoreSum += weight * data.score;
@@ -1401,23 +1012,15 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
       }
     }
 
-    const weightedMeanPositiveGateScores = weightedPositiveGateWeight > 0
-      ? weightedPositiveScoreSum / weightedPositiveGateWeight
-      : 0;
-    const weightedMeanNegativeGateScores = weightedNegativeGateWeight > 0
-      ? weightedNegativeScoreSum / weightedNegativeGateWeight
-      : 0;
-
+    const weightedMeanPositiveGateScores = weightedPositiveGateWeight > 0 ? weightedPositiveScoreSum / weightedPositiveGateWeight : 0;
+    const weightedMeanNegativeGateScores = weightedNegativeGateWeight > 0 ? weightedNegativeScoreSum / weightedNegativeGateWeight : 0;
     const persistent_gate_bonus = this.config.positiveGateInfluence * weightedMeanPositiveGateScores;
     const persistent_gate_penalty = this.config.negativeGateInfluence * weightedMeanNegativeGateScores;
+    const y_estimate = EpistemicProfiler.clamp(local_y_base + persistent_gate_bonus - persistent_gate_penalty, -1, 1);
 
-    const y_estimate = EpistemicProfiler.clamp(
-      local_y_base + persistent_gate_bonus - persistent_gate_penalty,
-      -1,
-      1,
-    );
-
-    const y_coverage = gateWeightsTotal > 0 ? weightedCoveredSum / gateWeightsTotal : 0;
+    const gateCoverage = gateWeightsTotal > 0 ? weightedCoveredSum / gateWeightsTotal : 0;
+    const gridCoverage = ((supportSummary.counts.y_positive > 0 ? 1 : 0) + (supportSummary.counts.y_negative > 0 ? 1 : 0) + (supportSummary.counts.x_integration > 0 ? 1 : 0) + (supportSummary.counts.z_integration > 0 ? 1 : 0)) / 4;
+    const y_coverage = EpistemicProfiler.clamp(Math.max(gateCoverage, gridCoverage), 0, 1);
 
     return {
       axis: "epistemicStability",
@@ -1426,26 +1029,31 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
       y_coverage,
       local_y_base,
       positiveSum,
-      softNegativeSum,
-      hardNegativeSum,
-      negativeSum: effectiveNegativeSum,
+      negativeSum,
       contradictionPenalty,
+      integrationBonus,
+      unresolvedAsymmetryPenalty,
       persistent_gate_bonus,
       persistent_gate_penalty,
       weightedMeanPositiveGateScores,
       weightedMeanNegativeGateScores,
-      positiveSignalCount,
-      negativeSignalCount,
-      derivedPositiveSignalCount,
-      derivedNegativeSignalCount,
+      gateCoverage,
+      gridCoverage,
+      positiveSignalCount: supportSummary.counts.y_positive || 0,
+      negativeSignalCount: supportSummary.counts.y_negative || 0,
       gateEventCount,
+      evidence_spans: {
+        positive: supportSummary.evidence_spans.y_positive || [],
+        negative: supportSummary.evidence_spans.y_negative || [],
+      },
     };
   }
 
   getSemanticProfile() {
-    const empathyPracticality = this.aggregateLateralAxis("empathyPracticality");
-    const wisdomKnowledge = this.aggregateLateralAxis("wisdomKnowledge");
-    const epistemicStability = this.aggregateY();
+    const supportSummary = this.computeDenseSupportTotals();
+    const empathyPracticality = this.aggregateLateralAxis("empathyPracticality", supportSummary);
+    const wisdomKnowledge = this.aggregateLateralAxis("wisdomKnowledge", supportSummary);
+    const epistemicStability = this.aggregateY(supportSummary, empathyPracticality, wisdomKnowledge);
 
     const a = empathyPracticality.raw;
     const b = wisdomKnowledge.raw;
@@ -1453,14 +1061,8 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
     const yCoverage = epistemicStability.y_coverage;
 
     return {
-      model: "epistemic_octahedron_profiler_v6",
-      semantics: {
-        a,
-        b,
-        s,
-        yEstimate: s,
-        yCoverage,
-      },
+      model: "epistemic_octahedron_profiler_v7",
+      semantics: { a, b, s, yEstimate: s, yCoverage },
       uiLike: {
         empathyPercent: (a + 1) * 50,
         practicalityPercent: 100 - (a + 1) * 50,
@@ -1473,6 +1075,7 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
         empathyPracticality,
         wisdomKnowledge,
         epistemicStability,
+        semanticGrid: cloneJSON(supportSummary),
         gateStates: cloneJSON(this.state.gateStates),
         profileState: cloneJSON(this.state.profileState),
       },
@@ -1527,11 +1130,7 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
     if (Math.abs(numeric) < threshold) return null;
     const labels = AXIS_LABELS[axisKey];
     const label = numeric >= 0 ? labels.positive : labels.negative;
-
-    if (axisKey === "epistemicStability") {
-      return `${EpistemicProfiler.formatSigned(numeric)} ${label}`;
-    }
-
+    if (axisKey === "epistemicStability") return `${EpistemicProfiler.formatSigned(numeric)} ${label}`;
     return `+${Math.abs(numeric).toFixed(2)} ${label}`;
   }
 
@@ -1539,32 +1138,26 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
     const threshold = Number(this.config.summaryAxisFloor ?? 0.04);
     const raw = Number(axisSummary?.raw) || 0;
     if (Math.abs(raw) >= threshold) return null;
-
     const positiveTotal = Number(axisSummary?.positiveTotal) || 0;
     const negativeTotal = Number(axisSummary?.negativeTotal) || 0;
     const integrationTotal = Number(axisSummary?.integrationTotal) || 0;
     const sourceCount = Number(axisSummary?.sourceCount) || 0;
     if (sourceCount <= 0) return null;
-
     const labels = AXIS_LABELS[axisKey];
     const hasPositive = positiveTotal > this.config.epsilon;
     const hasNegative = negativeTotal > this.config.epsilon;
     const hasIntegration = integrationTotal > this.config.epsilon;
     const axisTag = axisKey === "wisdomKnowledge" ? "z" : "x";
 
+    if (hasPositive && hasNegative && hasIntegration) {
+      return `[${axisTag} active: ${labels.positive}/${labels.negative} tension handled]`;
+    }
     if (hasPositive && hasNegative) {
-      return `[${axisTag} active: ${labels.positive}/${labels.negative} balance]`;
+      return `[${axisTag} active: ${labels.positive}/${labels.negative} both present]`;
     }
-    if (hasPositive) {
-      return `[${axisTag} active: ${labels.positive} present]`;
-    }
-    if (hasNegative) {
-      return `[${axisTag} active: ${labels.negative} present]`;
-    }
-    if (hasIntegration) {
-      return `[${axisTag} active: integrated tension]`;
-    }
-
+    if (hasPositive) return `[${axisTag} active: ${labels.positive} present]`;
+    if (hasNegative) return `[${axisTag} active: ${labels.negative} present]`;
+    if (hasIntegration) return `[${axisTag} active: integrated tension]`;
     return null;
   }
 
@@ -1573,14 +1166,8 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
     const yText = this.axisText(semantics.s, "epistemicStability");
     const xText = this.axisText(semantics.a, "empathyPracticality");
     const zText = this.axisText(semantics.b, "wisdomKnowledge");
-    const xActivityText = this.axisActivityText(
-      diagnostics.empathyPracticality,
-      "empathyPracticality",
-    );
-    const zActivityText = this.axisActivityText(
-      diagnostics.wisdomKnowledge,
-      "wisdomKnowledge",
-    );
+    const xActivityText = this.axisActivityText(diagnostics.empathyPracticality, "empathyPracticality");
+    const zActivityText = this.axisActivityText(diagnostics.wisdomKnowledge, "wisdomKnowledge");
 
     if (yText) parts.push(yText);
     if (xText) parts.push(xText);
@@ -1588,51 +1175,26 @@ normalizeSignalList(items = [], fallbackPolarity = "positive") {
     if (!xText && xActivityText) parts.push(xActivityText);
     if (!zText && zActivityText) parts.push(zActivityText);
 
-    if (!parts.length) {
-      return "0.00 null-state | no active worldview threshold met";
-    }
-
+    if (!parts.length) return "0.00 null-state | no active worldview threshold met";
     return `${parts.join(" ")} | compiled aggregate`;
   }
 
-
-buildSupportingNotes() {
-  const semanticProfile = this.getSemanticProfile();
-  const axisNotes = [];
-  for (const axis of [semanticProfile.diagnostics?.empathyPracticality, semanticProfile.diagnostics?.wisdomKnowledge]) {
-    if (!axis) continue;
-    if (axis.defaultWeightedBalance) {
-      const label = axis.axis === "empathyPracticality" ? "X" : "Z";
-      if (axis.tieBreakApplied) {
-        axisNotes.push(
-          `${label} axis tie-broken from under-specified opposing poles using local extraction text.`,
-        );
-      } else {
-        axisNotes.push(
-          `${label} axis opposing poles arrived with equal default weights and no explicit balance weighting.`,
-        );
-      }
-    }
+  buildSupportingNotes() {
+    return dedupeLatestFirst([
+      ...this.state.entries.flatMap((entry) => entry.notes || []),
+      ...this.state.profileState.risk_notes,
+    ]);
   }
-  return dedupeLatestFirst([
-    ...this.state.entries.flatMap((entry) => entry.notes || []),
-    ...this.state.profileState.risk_notes,
-    ...axisNotes,
-  ]);
-}
 
   computePoint() {
     const semanticProfile = this.getSemanticProfile();
     const { a, b, s, yCoverage } = semanticProfile.semantics;
-    const projection = EpistemicProfiler.projectSemanticTriple(a, s, b, {
-      epsilon: this.config.epsilon,
-    });
+    const projection = EpistemicProfiler.projectSemanticTriple(a, s, b, { epsilon: this.config.epsilon });
 
+    const denseTotals = semanticProfile.diagnostics.semanticGrid?.totals || {};
     const finalized = {
       model: semanticProfile.model,
-      profile: [
-        this.buildAggregateProfileLine(semanticProfile.semantics, semanticProfile.diagnostics),
-      ],
+      profile: [this.buildAggregateProfileLine(semanticProfile.semantics, semanticProfile.diagnostics)],
       notes: this.buildSupportingNotes(),
       data: {
         point: { ...projection.point },
@@ -1647,18 +1209,18 @@ buildSupportingNotes() {
             profile: cloneJSON(entry.display_profile_lines || []),
             fallback_profile_line: entry.fallback_profile_line || null,
             scope: entry.analysis_scope,
+            scope_strength: entry.scope_strength,
+            profiler_mode: entry.profiler_mode,
           })),
         },
         math: {
           formulas: {
-            axisAggregation:
-              String.raw`axis\_raw = \operatorname{clamp}\left(\frac{(positive\_pole - negative\_pole) \times (1 - integration\_ratio \times integration\_influence)}{saturation}, -1, 1\right)`,
-            yEstimate:
-              String.raw`y\_{estimate} = \operatorname{clamp}(local\_y\_base + persistent\_gate\_bonus - persistent\_gate\_penalty, -1, 1)`,
-            yCoverage:
-              String.raw`y\_{coverage} = \frac{\sum gate\_weights\_{covered}}{\sum gate\_weights\_{all}}`,
-            projection:
-              String.raw`(x,y,z) = \frac{(a,s,b)}{|a| + |s| + |b|}\;\text{when}\;|a| + |s| + |b| > 0`,
+            axisAggregation: String.raw`a = \operatorname{clamp}\left(\frac{(E - P) \cdot (1 - I_x)}{S_x}, -1, 1\right),\quad b = \operatorname{clamp}\left(\frac{(W - K) \cdot (1 - I_z)}{S_z}, -1, 1\right)`,
+            integrationSaturation: String.raw`I_x = \frac{X_{integration}}{X_{integration} + k},\quad I_z = \frac{Z_{integration}}{Z_{integration} + k}`,
+            yEstimate: String.raw`y_{local} = \operatorname{clamp}\left(\frac{Y_{+} - Y_{-} + \alpha(B_x I_x + B_z I_z) - \beta(|E-P|(1-I_x) + |W-K|(1-I_z)) - C}{S_y}, -1, 1\right)`,
+            yFinal: String.raw`y_{estimate} = \operatorname{clamp}(y_{local} + gate_{bonus} - gate_{penalty}, -1, 1)`,
+            yCoverage: String.raw`y_{coverage} = \max(gate\_coverage, grid\_coverage)`,
+            projection: String.raw`(x,y,z) = \frac{(a,s,b)}{|a| + |s| + |b|}\;\text{when}\;|a| + |s| + |b| > 0`,
             originRule: String.raw`|a| + |s| + |b| = 0 \Rightarrow (x,y,z) = (0,0,0)`,
             surfaceRule: String.raw`|x| + |y| + |z| = 1\;\text{for active worldview positions}`,
           },
@@ -1670,6 +1232,14 @@ buildSupportingNotes() {
             x: projection.point.x,
             y: projection.point.y,
             z: projection.point.z,
+            empathySupport: denseTotals.empathy || 0,
+            practicalitySupport: denseTotals.practicality || 0,
+            wisdomSupport: denseTotals.wisdom || 0,
+            knowledgeSupport: denseTotals.knowledge || 0,
+            xIntegrationSupport: denseTotals.x_integration || 0,
+            zIntegrationSupport: denseTotals.z_integration || 0,
+            yPositiveSupport: denseTotals.y_positive || 0,
+            yNegativeSupport: denseTotals.y_negative || 0,
             semanticMagnitude: projection.debug.magnitude,
             projectedManhattan: projection.debug.manhattan ?? 0,
           },
