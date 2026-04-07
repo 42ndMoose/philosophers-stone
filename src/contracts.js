@@ -45,16 +45,15 @@ version: 6.0
 PURPOSE
 The LLM is an extractor and canon optimizer only.
 It does not compute final scores, maturity percentages, or final x y z coordinates.
-The profiler later converts semantic values into the octahedron surface where |x| + |y| + |z| = 1.
 
-CONTEXT DISCIPLINE
+SOURCE DISCIPLINE
 Use only the text inside this packet.
-Do not browse the web.
-Do not call tools.
-Do not import outside facts or context.
-If the input mentions named entities, politics, history, science, or current events, extract only what the user text itself supports.
+Do not browse the web, call tools, or import outside context.
+If the input mentions people, events, politics, history, science, or current affairs, extract only what the user text itself supports.
 
-AXIS DEFINITIONS
+MODEL DEFINITIONS
+Active worldview plots live on the octahedron surface where |x| + |y| + |z| = 1.
+Axis meanings:
 - x negative = practicality
 - x positive = empathy
 - z negative = knowledge
@@ -63,30 +62,44 @@ AXIS DEFINITIONS
 - y positive = positive epistemic stability
 
 Operational meanings:
-- empathy / practicality = orientation toward persons versus functional demands
-- wisdom / knowledge = orientation toward deep judgment versus information, accumulation, or technical grasp
-- epistemic stability = coherence, reality-tracking, self-correction, and resistance to delusion under reflection or pressure
+- Empathy / Practicality = persons versus functional demands
+- Wisdom / Knowledge = deep judgment versus information or technical grasp
+- Epistemic stability = coherence, reality-tracking, self-correction, and resistance to delusion
 
-Model distinctions:
-- the upper vertex is objective peak philosophical maturity
-- the lower vertex is epistemic collapse
-- the origin is a pre-philosophical null state
-- non-asymmetry by absence is not the same as non-asymmetry by reflective integration
+CRITICAL GEOMETRY RULE
+A non-null active philosophy that is not near a pure vertex should not be returned as pure vertical-only support.
+If the text is active and epistemically positive or negative, but not near peak maturity or near collapse, do not leave all four lateral poles at zero.
+Give weak lateral pole support when the text itself gives any real basis for a side, even if the basis is slight and conservative.
+This avoids turning active non-peak philosophies into artificial top or bottom vertices after deterministic projection.
 
-INTERPRETIVE ROLE
-Your job is to fill a dense evidence grid.
-You are not deciding the final plot.
-You are not choosing the final dominant aspect.
-You are not awarding maturity.
-You are reporting how much support the text gives to each bucket.
+EXTRACTION RULES
+1. Extract portable philosophical structure, not final verdicts.
+2. Prefer under-calling over over-calling.
+3. Use evidence_span whenever possible.
+4. Only emit triggered gate events when the text gives actual evidence for or against a gate.
+5. Silence is neutral. Do not emit gate failures by absence.
+6. Do not compute the final plot.
+7. Do not let display labels or prior canon wording bias extraction.
+8. Use canon memory as context, not as something to parrot back.
+9. Thin input should produce conservative values by default.
+10. Generic coexistence, civility, tolerance, harmony, pluralism, unity, or balance language may support weak positive values, but does not by itself prove mature integration, strong fairness, or strong gate clearance.
+11. Moderate or strong signals require explicit structure in the text itself.
+12. Explicit structure includes at least one of:
+- a real tradeoff
+- a stated constraint
+- contradiction handling
+- self-correction
+- fair characterization of an opposing view
+- reality contact tied to consequences, limits, or lived conditions
+13. If evidence is too thin for a gate event, prefer local signals, principles, claimed_values, or notes instead.
+14. Do not convert a bare coexistence or pluralist claim into G2_non_strawman unless the text actually characterizes another view fairly enough to show contact with it.
+15. Do not mark explicit_balance or fair_tradeoff unless both poles or a real tradeoff are present in the text.
+16. When using semantic_grid, fill every field every time.
+17. Keep support and confidence separate. Support is how much of the construct is present. Confidence is how sure you are that the text supports that assignment.
+18. Pure zero across all four lateral poles should be reserved for true null or near-null extraction, not ordinary active philosophy.
 
-PRIMARY PROFILER GRID
-Always return profiler_mode = "dense_support_v1".
-Always return semantic_grid.
-The semantic_grid is primary for the profiler.
-The other human-readable fields should remain consistent with it.
-
-Grid buckets:
+SEMANTIC GRID
+Return semantic_grid every time with these eight fields:
 - empathy
 - practicality
 - wisdom
@@ -96,46 +109,25 @@ Grid buckets:
 - y_positive
 - y_negative
 
-For every semantic_grid bucket, return:
+For each field include:
 - support from 0.0 to 1.0
 - confidence from 0.0 to 1.0
-- evidence_spans as an array of short text spans, which may be empty
+- evidence_spans as an array
 
-Interpretation rules for the grid:
-- support = how much the text itself supports that bucket
-- confidence = how sure you are that the extraction is correct
-- no evidence means support 0.0 and an empty evidence_spans array
-- wording nuance belongs in this extraction layer, not in later calculator heuristics
-- be conservative with short or slogan-like inputs
+GENERAL GRID GUIDANCE
+- support = 0.0 is allowed
+- confidence may be 0.0 when support = 0.0
+- low-depth input should usually stay in the weak range
+- active but simple philosophy may still have weak nonzero support on one or more lateral poles
 
-Bucket meanings:
-- empathy = support for person-centered concern, care, mercy, humane regard, or relational priority
-- practicality = support for function, feasibility, consequence, logistics, viability, survival, or operational demands
-- wisdom = support for judgment, proportion, synthesis, mature framing, or wider orientation
-- knowledge = support for information, fact-accumulation, technical grasp, literal precision, or observational detail
-- x_integration = support that empathy and practicality are being handled together rather than merely one-sided
-- z_integration = support that wisdom and knowledge are being handled together rather than merely one-sided
-- y_positive = support for coherence, self-correction, counter-consideration, reality contact, or non-self-sealing stability
-- y_negative = support for false certainty, contradiction evasion, reality detachment, dogmatic closure, self-sealing, or collapse markers
-
-Integration rules:
-- x_integration should rise only when the text shows real handling of the empathy/practicality tension
-- z_integration should rise only when the text shows real handling of the wisdom/knowledge tension
-- mere coexistence, civility, harmony, or pluralism language may justify a weak signal, but not strong integration by itself
-- integration is not a substitute for the poles; if integration is above 0, the relevant pole buckets should usually also be above 0 when the text gives any reason for that
-- acknowledging two sides is weaker than integrating them
-
-EXTRACTION RULES
-1. Extract portable philosophical structure, not final verdicts.
-2. Prefer under-calling over over-calling.
-3. Use evidence spans whenever possible.
-4. Only emit triggered gate events when the text gives actual evidence for or against a gate.
-5. Silence is neutral. Do not emit gate failures by absence.
-6. Do not compute the final plot.
-7. Do not let display labels or prior canon wording bias extraction.
-8. Use canon memory as context, not as something to parrot back.
-9. If evidence is too thin for a gate event, leave the gate empty and keep the support in semantic_grid or local signals instead.
-10. Do not infer rich structure from generic low-depth wording.
+LOW-DEPTH ACTIVE CLAIMS
+A short active philosophy may still warrant weak lateral support.
+Example class:
+- conciliatory pluralist or coexistence claims may weakly support empathy, wisdom, or both if the wording genuinely points that way
+- they may also weakly support x_integration
+- they may weakly support y_positive
+- they usually do not justify strong gate events
+- they usually do not justify pure vertical-only output
 
 SCOPE CLASSIFICATION
 Always classify the input as one of:
@@ -181,6 +173,9 @@ For every pole evidence item, include:
 - strength = weak | moderate | strong
 - confidence from 0.5 to 1.0
 - evidence_span
+
+If one pole is primary and the other is only acknowledged or counterweighted, do not give them equal default emphasis.
+Acknowledging the opposite pole is not the same as weighting it equally.
 
 LOCAL Y SIGNALS
 Each local y signal should include:
