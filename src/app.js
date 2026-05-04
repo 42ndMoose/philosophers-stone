@@ -441,6 +441,7 @@ function buildProfilerAssessment() {
     additionalInfo: state.additionalInfo,
     computed: {
       point: finalizedData.point,
+      params: finalizedData.params,
       coveragePercent: finalizedData.params?.uiLike?.coveragePercent,
     },
   });
@@ -1021,12 +1022,23 @@ function buildMathDump(result) {
   const uiLike = params.uiLike || {};
   const diagnostics = finalizedData.diagnostics || {};
   const math = finalizedData.math || {};
+  const projectedPercentages = math.values?.projectedPercentages || {
+    empathy: ((Number(point.x) || 0) + 1) * 50,
+    practicality: 100 - (((Number(point.x) || 0) + 1) * 50),
+    wisdom: ((Number(point.z) || 0) + 1) * 50,
+    knowledge: 100 - (((Number(point.z) || 0) + 1) * 50),
+    stability: Math.abs(Number(point.y) || 0) * 100,
+    coverage: uiLike.coveragePercent ?? 0,
+  };
   return [
     "semantic_params = {",
     `  a: ${formatSigned(semantics.a)},`,
     `  b: ${formatSigned(semantics.b)},`,
     `  s: ${formatSigned(semantics.s)},`,
-    `  yCoverage: ${formatPercent((semantics.yCoverage || 0) * 100)},`,
+    `  yCoverage: ${formatPercent((semantics.yCoverage || 0) * 100)}`,
+    "}",
+    "",
+    "semantic_percentages = {",
     `  empathyPercent: ${formatPercent(uiLike.empathyPercent ?? 50)},`,
     `  practicalityPercent: ${formatPercent(uiLike.practicalityPercent ?? 50)},`,
     `  wisdomPercent: ${formatPercent(uiLike.wisdomPercent ?? 50)},`,
@@ -1039,6 +1051,15 @@ function buildMathDump(result) {
     `  x: ${formatCoord(point.x)},`,
     `  y: ${formatCoord(point.y)},`,
     `  z: ${formatCoord(point.z)}`,
+    "}",
+    "",
+    "projected_percentages = {",
+    `  empathyPercent: ${formatPercent(projectedPercentages.empathy ?? 50)},`,
+    `  practicalityPercent: ${formatPercent(projectedPercentages.practicality ?? 50)},`,
+    `  wisdomPercent: ${formatPercent(projectedPercentages.wisdom ?? 50)},`,
+    `  knowledgePercent: ${formatPercent(projectedPercentages.knowledge ?? 50)},`,
+    `  stabilityPercent: ${formatPercent(projectedPercentages.stability ?? 0)},`,
+    `  coveragePercent: ${formatPercent(projectedPercentages.coverage ?? 0)}`,
     "}",
     "",
     "latex = [",
