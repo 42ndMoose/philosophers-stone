@@ -1,0 +1,192 @@
+diff --git a/src/contracts.js b/src/contracts.js
+--- a/src/contracts.js
++++ b/src/contracts.js
+@@ -196,6 +196,24 @@ TARGETING
+ Outside-target failures go in local_y_* with target = criticized_system | described_other | quoted_view | mixed | unclear, not in self semantic y.
+ Silence is neutral. Do not infer failure from absence. Missing caveats, missing examples, or missing discussion of context may be unresolved_scope_gaps, but they are not y_negative, failed_gates, active risks, or negative gate events unless the text positively shows closure, reality-detachment, contradiction, or refusal of correction.
++
++COMMITMENT LAYER
++Do not collapse surface utterance, authorial belief, and durable profile memory into one thing.
++Always distinguish:
++1. surface_claim: what the sentence literally or rhetorically expresses.
++2. authorial_commitment: how strongly the packet evidences that the author actually endorses the claim.
++3. durable_profile_update: whether the evidence is strong enough to update persistent canon, principles, boundaries, gates, or risks.
++
++For terse, joking, slogan-like, quoted, fictional, ironic, test-style, or context-poor utterances, keep authorial_commitment_confidence low unless the packet clearly says the author endorses the stance.
++Do not create new durable principles or boundaries from a single ambiguous slogan-like utterance.
++If the surface wording itself shows closure, dismissal, or false certainty, you may report that at the surface-utterance level, but do not treat it as durable author belief unless authorial commitment is evidenced.
++If authorial commitment is weak or ambiguous, prefer profile_target_frame = mixed_or_ambiguous and set durable_profile_update_confidence below 0.45.
++If the text is explicitly submitted as the author's actual belief or self-description, authorial_commitment_confidence may be high.
++
++For example, "vegans gotta go." by itself may have a lower-half surface utterance diagnostic, but it should not create an anti-vegan persistent boundary unless literal authorial endorsement is explicit or strongly supported by context.
+ 
+ EVIDENCE RULES
+ Use support/confidence 0..1 and evidence_spans. Conservative if uncertain.
+@@ -283,6 +301,15 @@ REQUIRED JSON SHAPE
+   "scope_strength": "low | medium | high",
+   "profile_target_frame": "authorial_endorsement | self_description | described_subject | cautionary_example | quoted_view | mixed_or_ambiguous",
+   "statement_modes": [],
++  "intent_profile": {
++    "surface_claim": "literal or rhetorical claim expressed by the text, if any",
++    "surface_claim_confidence": 0.0,
++    "authorial_commitment_confidence": 0.0,
++    "durable_profile_update_confidence": 0.0,
++    "possible_nonliteral_reading": false,
++    "nonliteral_reading_type": "joke | irony | quote | fiction | test_prompt | unclear | none",
++    "notes": []
++  },
+   "profile": ["short display summary only"],
+   "semantic_grid": {
+     "empathy": { "support": 0.0, "confidence": 0.0, "evidence_spans": [] },
+diff --git a/src/profiler.js b/src/profiler.js
+--- a/src/profiler.js
++++ b/src/profiler.js
+@@ -311,6 +311,75 @@ function normalizeProfileTargetFrame(value) {
+   return PROFILE_TARGET_FRAMES.has(frame) ? frame : "authorial_endorsement";
+ }
++
++function defaultAuthorialCommitmentConfidence(frame = "authorial_endorsement", claimCommitments = []) {
++  const normalizedFrame = normalizeProfileTargetFrame(frame);
++  const commitments = Array.isArray(claimCommitments) ? claimCommitments : [];
++  const hasAssertedClaim = commitments.some((item) => cleanString(item?.commitment).toLowerCase() === "asserted");
++
++  if (normalizedFrame === "self_description") return 0.9;
++  if (normalizedFrame === "authorial_endorsement") return hasAssertedClaim ? 0.65 : 0.55;
++  if (normalizedFrame === "mixed_or_ambiguous") return 0.25;
++  if (normalizedFrame === "quoted_view" || normalizedFrame === "cautionary_example") return 0.05;
++  if (normalizedFrame === "described_subject") return 0.05;
++  return 0.25;
++}
++
++function normalizeIntentProfile(value = {}, { frame = "authorial_endorsement", claimCommitments = [] } = {}) {
++  const raw = value && typeof value === "object" ? value : {};
++  const possibleNonliteral = Boolean(
++    raw.possible_nonliteral_reading ??
++      raw.possibleNonliteralReading ??
++      raw.surface_only ??
++      raw.surfaceOnly ??
++      false,
++  );
++  const defaultCommitment = defaultAuthorialCommitmentConfidence(frame, claimCommitments);
++  const rawAuthorialCommitment =
++    raw.authorial_commitment_confidence ??
++    raw.authorialCommitmentConfidence ??
++    raw.commitment_confidence ??
++    raw.commitmentConfidence ??
++    defaultCommitment;
++  const authorialCommitment = EpistemicProfiler.clamp(Number(rawAuthorialCommitment), 0, 1);
++  const rawDurableCommitment =
++    raw.durable_profile_update_confidence ??
++    raw.durableProfileUpdateConfidence ??
++    raw.durable_commitment_confidence ??
++    raw.durableCommitmentConfidence ??
++    (possibleNonliteral ? Math.min(authorialCommitment, 0.25) : authorialCommitment);
++
++  return {
++    surface_claim: cleanString(raw.surface_claim || raw.surfaceClaim || raw.claim || ""),
++    surface_claim_confidence: EpistemicProfiler.clamp(
++      Number(raw.surface_claim_confidence ?? raw.surfaceClaimConfidence ?? 0),
++      0,
++      1,
++    ),
++    authorial_commitment_confidence: authorialCommitment,
++    durable_profile_update_confidence: EpistemicProfiler.clamp(Number(rawDurableCommitment), 0, 1),
++    possible_nonliteral_reading: possibleNonliteral,
++    nonliteral_reading_type: cleanString(raw.nonliteral_reading_type || raw.nonliteralReadingType || "none").toLowerCase() || "none",
++    notes: cleanStringList(raw.notes || []),
++  };
++}
++
++function entryAuthorialCommitmentConfidence(entry = {}) {
++  return EpistemicProfiler.clamp(Number(entry?.intent_profile?.authorial_commitment_confidence ?? 1), 0, 1);
++}
++
++function entryDurableProfileUpdateConfidence(entry = {}) {
++  return EpistemicProfiler.clamp(
++    Number(entry?.intent_profile?.durable_profile_update_confidence ?? entry?.intent_profile?.authorial_commitment_confidence ?? 1),
++    0,
++    1,
++  );
++}
+ 
+ function defaultAttributionTarget(frame, direction = "neutral") {
+   const normalizedFrame = normalizeProfileTargetFrame(frame);
+@@ -1586,6 +1655,7 @@ export class EpistemicProfiler {
+     ];
+     const claim_commitments = this.normalizeClaimCommitments(payload.claim_commitments || []);
++    const intent_profile = normalizeIntentProfile(payload.intent_profile || payload.intent || {}, { frame: profile_target_frame, claimCommitments: claim_commitments });
+     const autoGateSupport = this.inferAutoSupportedGateEvents({
+       triggered_gate_events: normalizedGateResult.accepted,
+       gate_update_proposals,
+@@ -1611,6 +1681,7 @@ export class EpistemicProfiler {
+       scope_strength,
+       profile_target_frame,
+       statement_modes: cleanStringList(payload.statement_modes || []),
++      intent_profile,
+       semantic_grid: this.normalizeSemanticGrid(payload.semantic_grid || {}),
+       dimension_consideration: this.normalizeDimensionConsideration(payload.dimension_consideration || {}),
+       claim_commitments,
+@@ -1699,8 +1770,24 @@ export class EpistemicProfiler {
+   }
+ 
+   shouldMergeEntryIntoPersistentProfile(entry = {}) {
+-    return this.isSelfMergingFrame(entry.profile_target_frame);
++    if (!this.isSelfMergingFrame(entry.profile_target_frame)) return false;
++    const threshold = Number(this.config.authorialCommitmentProfileMergeThreshold ?? 0.45);
++    return entryAuthorialCommitmentConfidence(entry) + this.config.epsilon >= threshold;
++  }
++
++  shouldMergeEntryIntoDurableCanon(entry = {}) {
++    if (!this.shouldMergeEntryIntoPersistentProfile(entry)) return false;
++    const threshold = Number(this.config.durableProfileUpdateThreshold ?? 0.55);
++    return entryDurableProfileUpdateConfidence(entry) + this.config.epsilon >= threshold;
+   }
+@@ -1889,7 +1976,9 @@ export class EpistemicProfiler {
+   }
+ 
+   mergeEntryIntoPersistentState(entry) {
+-    this.mergePrinciplesAndBoundaries(entry);
++    if (this.shouldMergeEntryIntoDurableCanon(entry)) {
++      this.mergePrinciplesAndBoundaries(entry);
++    }
+     if (this.shouldMergeEntryIntoPersistentProfile(entry)) {
+       this.mergeRiskEvents(entry);
+       this.mergeRiskNotes(entry);
+@@ -3430,6 +3519,16 @@ export class EpistemicProfiler {
+     return EpistemicProfiler.clamp(score, 0, 1);
+   }
++
++  authorialCommitmentScore(entry = {}) {
++    return entryAuthorialCommitmentConfidence(entry);
++  }
++
++  durableProfileUpdateScore(entry = {}) {
++    return entryDurableProfileUpdateConfidence(entry);
++  }
+ 
+   hasDeterminateSelfNegativeEvidence(entries = this.getAggregationEntries()) {
+     const threshold = Number(this.config.nearZeroProjectionGuardNegativeEvidenceThreshold ?? 0.25);
++    const commitmentThreshold = Number(this.config.authorialCommitmentProjectionThreshold ?? 0.45);
+     return (Array.isArray(entries) ? entries : []).some(
+-      (entry) => this.determinateSelfNegativeEvidenceScore(entry) >= threshold,
++      (entry) =>
++        this.authorialCommitmentScore(entry) + this.config.epsilon >= commitmentThreshold &&
++        this.determinateSelfNegativeEvidenceScore(entry) >= threshold,
+     );
+   }
+@@ -3728,6 +3827,8 @@ export class EpistemicProfiler {
+           lowSignalProjectionGuard: {
+             hasDeterminateSelfNegativeEvidence,
+             negativeEvidenceThreshold: Number(this.config.nearZeroProjectionGuardNegativeEvidenceThreshold ?? 0.25),
++            authorialCommitmentProjectionThreshold: Number(this.config.authorialCommitmentProjectionThreshold ?? 0.45),
++            activeEntryAuthorialCommitmentScore: aggregationEntries.length ? this.authorialCommitmentScore(aggregationEntries[aggregationEntries.length - 1]) : 0,
+           },
+           supportingEntryProfiles: this.state.entries.map((entry) => ({
+             addedAt: entry.addedAt,
+@@ -3737,6 +3838,7 @@ export class EpistemicProfiler {
+             scope: entry.analysis_scope,
+             profile_target_frame: normalizeProfileTargetFrame(entry.profile_target_frame),
++            intent_profile: cloneJSON(entry.intent_profile || {}),
+             merged_into_cumulative_profile: aggregationEntries.includes(entry),
+             dimension_consideration: cloneJSON(entry.dimension_consideration || {}),
+             triggered_gate_events: cloneJSON(entry.triggered_gate_events || []),
